@@ -1,0 +1,21 @@
+NOTICE
+======
+mkz and autocol
+Copyright (c) Matthew Klein.
+
+Dual-licensed MIT OR Apache-2.0 (see LICENSE-MIT and LICENSE-APACHE).
+
+Vendored code (included in this source tree)
+--------------------------------------------
+- sha256.c: Not sure where this came from exactlty. 
+  I needed an implementation of SHA-256, FIPS 180 4.
+  Looks like Public-domain either way, did do verify
+  aginst RFC 6234. (datatracker.ietf.org/doc/rfc6234)
+  Not written by me.         If it's yours-thank you!
+
+Runtime dependency (NOT bundled)
+--------------------------------
+- zstd (libzstd) is the compression backend. It is linked at build time and is not
+  included in this source tree. zstd is licensed BSD-3-Clause (dual with GPLv2),
+  Copyright (c) Meta Platforms, Inc. and affiliates (Yann Collet).
+  https://github.com/facebook/zstd

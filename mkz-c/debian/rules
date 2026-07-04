@@ -1,0 +1,11 @@
+#!/usr/bin/make -f
+# Build with debhelper. The upstream Makefile already honors CPPFLAGS/CFLAGS/LDFLAGS,
+# so dpkg-buildflags hardening is applied automatically. dh_auto_build runs `make`
+# (default target builds mkz); dh_auto_test runs `make check`.
+
+%:
+	dh $@
+
+# Upstream installs to $(PREFIX)/{bin,man/man1}; point it at Debian's layout.
+override_dh_auto_install:
+	dh_auto_install -- PREFIX=/usr MANDIR=/usr/share/man/man1

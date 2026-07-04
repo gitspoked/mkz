@@ -1,0 +1,17 @@
+test_base95
+test_b95u16
+test_pas1
+test_autocol
+test_acenc
+*.o
+mkz
+mkz.asan
+mkz-*.tar.gz
+# debhelper build artifacts (if someone builds the package in-tree)
+debian/.debhelper/
+debian/files
+debian/mkz/
+debian/tmp/
+debian/*.substvars
+debian/*.log
+debian/debhelper-build-stamp

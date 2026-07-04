@@ -1,0 +1,141 @@
+.\" mkz.1: manual page for the pure-C mkz.
+.\" SPDX-License-Identifier: MIT OR Apache-2.0
+.Dd June 29, 2026
+.Dt MKZ 1
+.Os
+.Sh NAME
+.Nm mkz
+.Nd reversible columnar pre-pass + zstd archiver
+.Sh SYNOPSIS
+.Nm
+.Fl c
+.Op Fl z Ns Ar level
+.Op Fl v
+.Fl f Ar archive
+.Ar file ...
+.Nm
+.Fl x
+.Op Fl v
+.Fl f Ar archive
+.Op Ar destdir
+.Nm
+.Op Fl hV
+.Sh DESCRIPTION
+.Nm
+is a tar-style archiver whose backend is a reversible, schema-free
+.Em auto-columnar
+transform followed by
+.Xr zstd 1 .
+It is not a new compressor but a structural pre-pass that makes a general
+compressor smaller on structured, line-oriented data
+.Pq logs, CSV, JSONL, telemetry
+and never worse anywhere else.
+.Pp
+For each block of input,
+.Nm
+discovers record structure with no schema, gathers the varying fields into
+per-column streams, delta-codes numeric columns, and dedups repeated values
+through a shared dictionary, producing a packed blob.
+It then compresses both the raw block and the transformed blob with
+.Xr zstd 1
+and keeps whichever is smaller
+.Pq the never-worse gate ,
+so the transform can only help or no-op.
+Every archive carries a SHA-256 of the reconstructed original; extraction
+verifies this SHA-256 over the whole stream and reports corruption on a
+mismatch.
+Extraction is not yet atomic, so a corrupt trailer can leave already-written
+files in place; a future release will extract via a temporary path and rename.
+.Pp
+Both creation and extraction stream line-oriented input in bounded memory for
+typical text and logs: peak memory is roughly one block.
+Only one input file is open at a time.
+Pathological newline-free input is the exception: a block is read up to the
+next newline, so a file with no newlines is buffered whole and is not yet
+bounded.
+.Pp
+This is the pure-C build; it is byte-compatible with the reference
+implementation in both directions.
+.Sh OPTIONS
+.Bl -tag -width Ds
+.It Fl c
+Create an archive from the given files and directories.
+.It Fl x
+Extract an archive.
+The optional
+.Ar destdir
+defaults to the current directory.
+.It Fl z Ns Ar level
+Set the
+.Xr zstd 1
+compression level
+.Pq 1 to 22, default 12 .
+The level attaches to the flag with no space and may be clustered with
+.Fl c ,
+e.g.\&
+.Fl cz19f .
+.It Fl f Ar archive
+The archive file to create or read
+.Pq required .
+.It Fl v
+Verbose: list each entry as it is processed.
+.It Fl h
+Print a usage summary and exit.
+.It Fl V
+Print the version and exit.
+.El
+.Sh ENVIRONMENT
+.Bl -tag -width PSRC_AC_ZSTD_LEVEL
+.It Ev PSRC_AC_ZSTD_LEVEL
+Default
+.Xr zstd 1
+level when
+.Cm z
+is not given
+.Pq default 12 .
+.It Ev PSRC_AC_BLOCK_MB
+Block size in mebibytes for create
+.Pq default 16 .
+.El
+.Sh EXIT STATUS
+.Ex -std
+On extract,
+.Nm
+fails
+.Pq nonzero
+if the archive is malformed, truncated, or fails its SHA-256 integrity check.
+.Sh EXAMPLES
+Create a compressed archive of
+.Pa /var/log :
+.Pp
+.Dl $ mkz -czf logs.mkz /var/log
+.Pp
+Create at
+.Xr zstd 1
+level 19, verbosely:
+.Pp
+.Dl $ mkz -cz19vf data.mkz data/
+.Pp
+Extract into
+.Pa out/ :
+.Pp
+.Dl $ mkz -xvf logs.mkz out/
+.Sh SEE ALSO
+.Xr tar 1 ,
+.Xr zstd 1
+.Sh STANDARDS
+The archive format is the
+.Sy PAS1
+container: a magic, a sequence of framed
+.Xr zstd 1
+blocks
+.Pq each flagged raw or auto-columnar ,
+and a trailing SHA-256 of the reconstructed original.
+.Sh AUTHORS
+.An Matthew Klein .
+.Sh CAVEATS
+Symbolic links and special files are skipped.
+Stored paths are normalized to be relocatable; extraction rejects absolute
+paths and
+.Sq ..
+traversal.

@@ -1,0 +1,15 @@
+# Minimal workspace root for publishing from this staging copy.
+# Mirrors only what the two published crates need from the full psrc workspace,
+# so `{ workspace = true }` deps resolve without dragging the other 13 crates in.
+[workspace]
+members = [
+    "crates/psrc-autocol",
+    "crates/psrc-mkz",
+]
+resolver = "2"
+
+[workspace.dependencies]
+sha2     = "0.10"
+anyhow   = "1"
+zstd     = "0.13"
+proptest = "1"

@@ -1,0 +1,40 @@
+mkz install
+===========
+
+mkz needs libzstd at runtime; that is the only dependency. Pick whichever path fits.
+
+From source (C, no Rust needed)
+-------------------------------
+Needs a C11 compiler and libzstd (with dev headers).
+
+    ./install.sh                       # build + install (uses make; asks for sudo if needed)
+
+or by hand:
+
+    make                               # builds ./mkz
+    make install PREFIX=/usr/local     # installs mkz + mkz.1 (honors DESTDIR)
+
+No make at all? One compiler line:
+
+    cc -O2 -std=c11 -o mkz \
+       mkz.c stream.c pas1.c sha256.c autocol.c archive.c -lzstd
+
+From crates.io (Rust)
+---------------------
+    cargo install mkz                  # installs the `mkz` binary
+
+Packages
+--------
+    OpenBSD:  pkg_add mkz               # once the port is in the tree (see the port skeleton)
+    Debian:   sudo apt install ./mkz_0.1.0-1_amd64.deb   # once built (see debian/)
+
+Check it
+--------
+    mkz -h                             # tar-style usage
+    make check                         # C unit tests (from source)
+
+Uninstall (source install)
+--------------------------
+    make uninstall PREFIX=/usr/local
+
+Dual-licensed MIT OR Apache-2.0. See LICENSE-MIT and LICENSE-APACHE.

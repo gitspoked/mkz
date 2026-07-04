@@ -1,0 +1,22 @@
+[package]
+name = "mkz"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+description = "Streaming file compressor (bounded memory for typical text/logs): a reversible autocol pre-pass into zstd, with a never-worse safe gate and a SHA-256 integrity gate. Smaller on logs/CSV/JSONL; bit-exact; never larger than zstd alone."
+readme = "README.md"
+keywords = ["compression", "streaming", "zstd", "logs", "cli"]
+categories = ["compression", "command-line-utilities"]
+repository = "https://github.com/gitspoked/mkz"
+authors = ["Matt Klein <mk@ntele.net>"]
+
+[[bin]]
+name = "mkz"
+path = "src/main.rs"
+
+[dependencies]
+# path+version so it builds in-tree AND is publishable to crates.io
+autocol = { path = "../psrc-autocol", version = "0.1.0" }
+zstd = { workspace = true }
+sha2 = { workspace = true }
+anyhow = { workspace = true }
