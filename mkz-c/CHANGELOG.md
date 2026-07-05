@@ -3,7 +3,7 @@
 Notable changes to mkz and autocol. Versions are SemVer; format loosely follows
 Keep a Changelog.
 
-## [Unreleased]
+## [0.1.1] - 2026-07-05 (Rust crate release; C tool follows with the next tarball)
 
 ### mkz (both implementations)
 - `-v` on create now reports what the autocol pre-pass earned: blocks kept vs total,

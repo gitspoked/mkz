@@ -1,6 +1,6 @@
 [package]
 name = "mkz"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 description = "Streaming file compressor (bounded memory for typical text/logs): a reversible autocol pre-pass into zstd, with a never-worse safe gate and a SHA-256 integrity gate. Smaller on logs/CSV/JSONL; bit-exact; never larger than zstd alone."
