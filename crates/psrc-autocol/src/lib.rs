@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT OR Apache-2.0
 //! psrc-autocol — schema-free auto-columnar transform.
 //!
 //! A reversible, SHA-256-verifiable transform that discovers record structure in

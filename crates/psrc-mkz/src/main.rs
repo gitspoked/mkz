@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT OR Apache-2.0
 //! mkz (crate `mkz`) is a tar-style archiver whose backend is the `autocol`
 //! pre-pass plus zstd.
 //!
