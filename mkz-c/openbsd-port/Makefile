@@ -4,11 +4,9 @@ V =		0.1.0
 DISTNAME =	mkz-${V}
 CATEGORIES =	archivers
 
-# TODO: set to the real project page before submission.
-HOMEPAGE =	https://example.org/mkz/
+HOMEPAGE =	https://github.com/gitspoked/mkz
 
-# TODO: set to the port maintainer's address before submission.
-MAINTAINER =	Matthew Klein <maintainer@example.org>
+MAINTAINER =	Matt Klein <mk@ntele.net>
 
 # mkz is dual-licensed MIT OR Apache-2.0.
 PERMIT_PACKAGE =	Yes
@@ -16,8 +14,10 @@ PERMIT_PACKAGE =	Yes
 # Links libc and libzstd only (SHA-256 and base-95 are vendored).
 WANTLIB =		c zstd
 
-# TODO: set to wherever mkz-${V}.tar.gz is published, then run `make makesum`.
-MASTER_SITES =		https://example.org/distfiles/
+SITES =		https://github.com/gitspoked/mkz/releases/download/v${V}/
+
+# The release tarball extracts to mkz-c/ (the pure-C tree), not ${DISTNAME}/.
+WRKSRC =		${WRKDIR}/mkz-c
 
 LIB_DEPENDS =		archivers/zstd
 
