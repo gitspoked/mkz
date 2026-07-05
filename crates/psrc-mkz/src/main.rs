@@ -116,9 +116,38 @@ fn read_block<R: BufRead>(r: &mut R, target: usize) -> io::Result<Vec<u8>> {
     Ok(buf)
 }
 
-fn compress_stream<R: BufRead, W: Write>(r: &mut R, w: &mut W, block: usize, level: i32) -> Result<()> {
+/// Create-side statistics, accumulated per encoded block. The never-worse gate already
+/// compresses every block both ways, so `zstd_alone_bytes` (what plain zstd would have
+/// cost) is exact, not an estimate; saved = zstd_alone_bytes - payload_bytes >= 0.
+#[derive(Default)]
+struct CompressStats {
+    blocks: u64,
+    autocol_blocks: u64,
+    orig_bytes: u64,
+    payload_bytes: u64,
+    zstd_alone_bytes: u64,
+}
+
+impl CompressStats {
+    fn report(&self) -> String {
+        let pct = |num: u64, den: u64| if den == 0 { 0.0 } else { 100.0 * num as f64 / den as f64 };
+        let saved = self.zstd_alone_bytes - self.payload_bytes;
+        format!(
+            "mkz: autocol kept {}/{} blocks ({:.1}%); payloads {:.1}% of stream; saved {} bytes ({:.1}%) vs zstd alone",
+            self.autocol_blocks,
+            self.blocks,
+            pct(self.autocol_blocks, self.blocks),
+            pct(self.payload_bytes, self.orig_bytes),
+            saved,
+            pct(saved, self.zstd_alone_bytes),
+        )
+    }
+}
+
+fn compress_stream<R: BufRead, W: Write>(r: &mut R, w: &mut W, block: usize, level: i32) -> Result<CompressStats> {
     w.write_all(MAGIC)?;
     let mut hasher = Sha256::new();
+    let mut stats = CompressStats::default();
     loop {
         let data = read_block(r, block)?;
         if data.is_empty() {
@@ -126,6 +155,7 @@ fn compress_stream<R: BufRead, W: Write>(r: &mut R, w: &mut W, block: usize, lev
         }
         hasher.update(&data);
         let comp_raw = zstd::encode_all(&data[..], level).context("zstd (raw block)")?;
+        let comp_raw_len = comp_raw.len();
         let ac = autocol::encode(&data);
         let (flags, payload) = if autocol::try_decode(&ac).as_deref() == Some(&data[..]) {
             let comp_ac = zstd::encode_all(&ac[..], level).context("zstd (autocol block)")?;
@@ -137,6 +167,11 @@ fn compress_stream<R: BufRead, W: Write>(r: &mut R, w: &mut W, block: usize, lev
         } else {
             (0u8, comp_raw)
         };
+        stats.blocks += 1;
+        stats.autocol_blocks += u64::from(flags & 1);
+        stats.orig_bytes += data.len() as u64;
+        stats.payload_bytes += payload.len() as u64;
+        stats.zstd_alone_bytes += comp_raw_len as u64;
         w.write_all(&[1u8])?;
         w.write_all(&[flags])?;
         write_uvarint(w, data.len() as u64)?;
@@ -145,7 +180,7 @@ fn compress_stream<R: BufRead, W: Write>(r: &mut R, w: &mut W, block: usize, lev
     }
     w.write_all(&[0u8])?;
     w.write_all(&hasher.finalize())?;
-    Ok(())
+    Ok(stats)
 }
 
 fn decompress_stream<R: Read, W: Write>(r: &mut R, w: &mut W) -> Result<()> {
@@ -410,8 +445,11 @@ fn create(archive: &str, paths: &[String], block: usize, level: i32, verbose: bo
     let entries = collect_entries(paths)?;
     let mut reader = BufReader::new(ArchiveReader::new(entries, verbose));
     let mut w = BufWriter::new(File::create(archive).with_context(|| format!("create {archive}"))?);
-    compress_stream(&mut reader, &mut w, block, level)?;
+    let stats = compress_stream(&mut reader, &mut w, block, level)?;
     w.flush()?;
+    if verbose {
+        eprintln!("{}", stats.report());
+    }
     let o = std::fs::metadata(archive)?.len();
     eprintln!("mkz: wrote {archive} ({o} bytes, {} MB blocks, zstd {level})", block >> 20);
     Ok(())

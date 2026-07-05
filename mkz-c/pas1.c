@@ -118,8 +118,9 @@ static int zstd_one(const uint8_t *src, size_t n, int level, uint8_t **out, size
  * autocol only when it round-trips via the C decoder AND zstd's strictly smaller than raw).
  * Sets *flags (bit0 = autocol) and mallocs *payload (caller frees). Shared by the in-memory
  * and streaming compressors so the gate lives in exactly one place. 0 / -1. */
-int mkz_pas1_encode_block(const uint8_t *data, size_t len, int level,
-                          uint8_t *flags, uint8_t **payload, size_t *payload_len) {
+int mkz_pas1_encode_block_stats(const uint8_t *data, size_t len, int level,
+                                uint8_t *flags, uint8_t **payload, size_t *payload_len,
+                                struct mkz_pas1_stats *st) {
     uint8_t *craw = NULL; size_t craw_len = 0;
     if (zstd_one(data, len, level, &craw, &craw_len)) return -1;
 
@@ -141,8 +142,21 @@ int mkz_pas1_encode_block(const uint8_t *data, size_t len, int level,
     }
     free(ac);
 
+    if (st) {
+        st->blocks++;
+        st->autocol_blocks += (uint64_t)(fl & 1);
+        st->orig_bytes += (uint64_t)len;
+        st->payload_bytes += (uint64_t)chosen_len;
+        st->zstd_alone_bytes += (uint64_t)craw_len;
+    }
+
     *flags = fl; *payload = chosen; *payload_len = chosen_len;
     return 0;
+}
+
+int mkz_pas1_encode_block(const uint8_t *data, size_t len, int level,
+                          uint8_t *flags, uint8_t **payload, size_t *payload_len) {
+    return mkz_pas1_encode_block_stats(data, len, level, flags, payload, payload_len, NULL);
 }
 
 /* Decode ONE block payload back to its original bytes. zstd-decompress (streaming, since the

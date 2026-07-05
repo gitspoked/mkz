@@ -201,6 +201,7 @@ int mkz_create_stream(const char *const *paths, size_t npaths, const char *archi
     s.ents = ents; s.nent = nent; s.verbose = verbose;
     struct sbuf blk = {0};
     struct mkz_sha256_ctx sha; mkz_sha256_init(&sha);
+    struct mkz_pas1_stats stt = {0};
     int rc = -1;
 
     if (fwrite("PAS1", 1, 4, out) != 4) goto done;
@@ -210,7 +211,7 @@ int mkz_create_stream(const char *const *paths, size_t npaths, const char *archi
         if (blk.len == 0) break;
         mkz_sha256_update(&sha, blk.d, blk.len);
         uint8_t flags = 0, *payload = NULL; size_t payload_len = 0;
-        if (mkz_pas1_encode_block(blk.d, blk.len, level, &flags, &payload, &payload_len)) goto done;
+        if (mkz_pas1_encode_block_stats(blk.d, blk.len, level, &flags, &payload, &payload_len, &stt)) goto done;
         int e = wr_u8(out, 1) || wr_u8(out, flags)
                 || wr_uv(out, (uint64_t)blk.len) || wr_uv(out, (uint64_t)payload_len)
                 || (payload_len && fwrite(payload, 1, payload_len, out) != payload_len);
@@ -222,6 +223,19 @@ int mkz_create_stream(const char *const *paths, size_t npaths, const char *archi
         uint8_t digest[32];
         mkz_sha256_final(&sha, digest);
         if (wr_u8(out, 0) || fwrite(digest, 1, 32, out) != 32) goto done;
+    }
+    if (verbose) {
+        /* The gate compresses every block both ways, so the "vs zstd alone" comparison is
+         * exact, not an estimate. saved >= 0 always (that's the never-worse guarantee). */
+        uint64_t saved = stt.zstd_alone_bytes - stt.payload_bytes;
+        fprintf(stderr,
+                "mkz: autocol kept %llu/%llu blocks (%.1f%%); payloads %.1f%% of stream; "
+                "saved %llu bytes (%.1f%%) vs zstd alone\n",
+                (unsigned long long)stt.autocol_blocks, (unsigned long long)stt.blocks,
+                stt.blocks ? 100.0 * (double)stt.autocol_blocks / (double)stt.blocks : 0.0,
+                stt.orig_bytes ? 100.0 * (double)stt.payload_bytes / (double)stt.orig_bytes : 0.0,
+                (unsigned long long)saved,
+                stt.zstd_alone_bytes ? 100.0 * (double)saved / (double)stt.zstd_alone_bytes : 0.0);
     }
     rc = 0;
 done:

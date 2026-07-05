@@ -26,6 +26,23 @@ int mkz_pas1_decompress(const uint8_t *in, size_t in_len, uint8_t **out, size_t 
 /* Per-block primitives, shared by the in-memory and the streaming codecs so the never-worse
  * gate and the audited decode live in exactly one place. */
 
+/* Create-side statistics, accumulated per encoded block. The never-worse gate already
+ * compresses both candidates, so `zstd_alone_bytes` (what plain zstd would have cost)
+ * comes for free; saved = zstd_alone_bytes - payload_bytes, always >= 0 by the gate. */
+struct mkz_pas1_stats {
+    uint64_t blocks;           /* blocks encoded */
+    uint64_t autocol_blocks;   /* blocks where the gate kept the autocol pre-pass */
+    uint64_t orig_bytes;       /* total uncompressed stream bytes */
+    uint64_t payload_bytes;    /* total chosen compressed payload bytes */
+    uint64_t zstd_alone_bytes; /* total plain-zstd candidate bytes */
+};
+
+/* Encode one block (raw-zstd + autocol gate). Sets *flags (bit0 = autocol), mallocs *payload
+ * (caller frees). If `st` is non-NULL, accumulates create statistics into it. 0 / -1. */
+int mkz_pas1_encode_block_stats(const uint8_t *data, size_t len, int level,
+                                uint8_t *flags, uint8_t **payload, size_t *payload_len,
+                                struct mkz_pas1_stats *st);
+
 /* Encode one block (raw-zstd + autocol gate). Sets *flags (bit0 = autocol), mallocs *payload
  * (caller frees). 0 / -1. */
 int mkz_pas1_encode_block(const uint8_t *data, size_t len, int level,

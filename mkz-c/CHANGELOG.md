@@ -3,7 +3,16 @@
 Notable changes to mkz and autocol. Versions are SemVer; format loosely follows
 Keep a Changelog.
 
-## [0.1.0] - unreleased (initial release)
+## [Unreleased]
+
+### mkz (both implementations)
+- `-v` on create now reports what the autocol pre-pass earned: blocks kept vs total,
+  payload-to-stream ratio, and exact bytes/percent saved versus zstd alone. The
+  never-worse gate already compresses every block both ways to decide, so the
+  comparison is measured, not estimated — and costs nothing extra.
+- C `--version` suffix aligned with the Rust build: `(psrc)` / `(psrc, C port)`.
+
+## [0.1.0] - 2026-07-04 (initial release)
 
 ### mkz
 - Tar-style archiver: a reversible auto-columnar pre-pass (`autocol`) followed by zstd,

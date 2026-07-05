@@ -52,7 +52,7 @@ int main(int argc, char **argv) {
     for (int i = 1; i < argc; i++) {
         const char *a = argv[i];
         if (!strcmp(a, "-h") || !strcmp(a, "--help")) { printf("%s", HELP); free(pos); return 0; }
-        if (!strcmp(a, "-V") || !strcmp(a, "--version")) { printf("mkz %s (psrc-ac, C port)\n", MKZ_VERSION); free(pos); return 0; }
+        if (!strcmp(a, "-V") || !strcmp(a, "--version")) { printf("mkz %s (psrc, C port)\n", MKZ_VERSION); free(pos); return 0; }
         if (a[0] == '-' && a[1] != '\0' && a[1] != '-') {
             for (const char *c = a + 1; *c; c++) {
                 switch (*c) {
