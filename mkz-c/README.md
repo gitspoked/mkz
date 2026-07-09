@@ -33,7 +33,7 @@ telemetry) and is never worse anywhere else:
    the whole stream and reports corruption on a mismatch; it is not yet atomic, so a corrupt
    trailer can leave already-written files in place (temp+rename is planned for a future release).
 
-Measured 20–44% smaller than plain zstd on real logs, bit-exact. On unstructured or
+Measured 20-44% smaller than plain zstd on real logs, bit-exact. On unstructured or
 already-compressed data it falls back to plain zstd, so it never loses.
 
 ## Build
@@ -43,7 +43,7 @@ is genuinely the only thing you need to link).
 
 ```sh
 make                             # build the CLI (mkz)
-make check                       # build + run the C↔C unit tests
+make check                       # build + run the C<->C unit tests
 make install PREFIX=/usr/local   # install mkz + mkz.1 (honors DESTDIR)
 make dist                        # build the release tarball mkz-<V>.tar.gz (prints sha256/size)
 make clean
@@ -82,7 +82,7 @@ mkz -xf  logs.mkz                        # extract into the current dir
 |------|---------|
 | `-c` | create |
 | `-x` | extract |
-| `-z[LEVEL]` | zstd level 1–22 (default 12) |
+| `-z[LEVEL]` | zstd level 1-22 (default 12) |
 | `-f <archive>` | archive filename (required) |
 | `-v` | verbose (list entries) |
 
@@ -123,24 +123,24 @@ sanitizers.
 the raw block). The archived byte stream itself is a flat tar-style entry stream:
 
 ```
-( [tag u8: 0=file / 1=dir][uvarint path_len][path]   ·   file only: [uvarint size][bytes] )*
+( [tag u8: 0=file / 1=dir][uvarint path_len][path]   +   file only: [uvarint size][bytes] )*
 ```
 
-The autocol blob format (templates, record→template ids, shared value dictionary, and
+The autocol blob format (templates, record->template ids, shared value dictionary, and
 per-column codecs `0=raw / 1=zigzag-delta / 2=dict-ref`) is documented in the
 [`autocol`](../crates/psrc-autocol) crate; this port is byte-for-byte compatible with
 it.
 
-A note on zstd interop: the Rust `mkz` does not pledge the frame content size into the zstd
-header, so this port decompresses with the streaming API (a growing buffer) rather than
-reading a size up front.
+A note on zstd interop: the decoder does not rely on a pledged frame content size (some
+archives omit it), so this port decompresses with the streaming API (a growing buffer)
+rather than reading a size up front.
 
 ## Parity & testing
 
 - C encoder output is byte-identical to the Rust `mkz transform` on edge cases and real
   logs (including a 13.6 MB `install.log`) plus fuzz inputs.
-- Full archive interop is bit-exact in all three directions: C→C, C→Rust, Rust→C.
-- `make check` runs the C↔C unit tests (base-95, b95u16, PAS1 container round-trip, and the
+- Full archive interop is bit-exact in all three directions: C->C, C->Rust, Rust->C.
+- `make check` runs the C<->C unit tests (base-95, b95u16, PAS1 container round-trip, and the
   paranoid decoder's rejections).
 
 The Rust `mkz` (`../crates/psrc-mkz`) is the oracle; this port is validated against it.
@@ -149,7 +149,7 @@ The Rust `mkz` (`../crates/psrc-mkz`) is the oracle; this port is validated agai
 
 Dual-licensed under MIT OR Apache-2.0 (OpenBSD-ports clean). 
 
-Copyright © 2026 Matthew Klein.
+Copyright (c) 2026 Matthew Klein.
 
 ## Maintainer
 

@@ -3,13 +3,27 @@
 Notable changes to mkz and autocol. Versions are SemVer; format loosely follows
 Keep a Changelog.
 
+## [0.1.2] - 2026-07-09 (crates, C tool, and OpenBSD port unified on one version)
+
+### mkz (both implementations)
+- The Rust encoder now pledges the zstd frame content size (via `zstd::bulk::compress`),
+  matching the C one-shot encoder. On a shared libzstd the two implementations now emit
+  byte-identical archives; decoders still accept frames with or without a pledged size, so
+  archives remain cross-compatible in both directions.
+
+### C build
+- `make check` now passes `${CPPFLAGS}` when compiling the container test, so `<zstd.h>` is
+  found when libzstd lives under a non-default prefix (e.g. `${LOCALBASE}` on OpenBSD). The
+  OpenBSD port no longer needs a Makefile patch, and the distfile roots at `${DISTNAME}/`
+  (standard layout), so the port drops its `WRKDIST` override.
+
 ## [0.1.1] - 2026-07-05 (Rust crate release; C tool follows with the next tarball)
 
 ### mkz (both implementations)
 - `-v` on create now reports what the autocol pre-pass earned: blocks kept vs total,
   payload-to-stream ratio, and exact bytes/percent saved versus zstd alone. The
   never-worse gate already compresses every block both ways to decide, so the
-  comparison is measured, not estimated — and costs nothing extra.
+  comparison is measured, not estimated, and costs nothing extra.
 - C `--version` suffix aligned with the Rust build: `(psrc)` / `(psrc, C port)`.
 
 ## [0.1.0] - 2026-07-04 (initial release)
@@ -32,4 +46,4 @@ Keep a Changelog.
   you feed its output to your own backend.
 
 ### Roadmap
-- 0.1.1 cleanup · 0.1.2 dictionary work · 0.1.3 brotli backend.
+- 0.1.1 cleanup / 0.1.2 dictionary work / 0.1.3 brotli backend.

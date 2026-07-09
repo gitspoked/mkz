@@ -2,12 +2,12 @@ mkz is a tar-style archiver whose backend is a reversible, schema-free
 auto-columnar transform followed by zstd. It is not a new compressor: it is
 a structural pre-pass that makes zstd measurably smaller on structured,
 line-oriented data (logs, CSV, JSONL, telemetry) and is provably never worse
-anywhere else -- each block keeps whichever of raw-zstd or transformed-zstd
+anywhere else: each block keeps whichever of raw-zstd or transformed-zstd
 is smaller.
 
 Both creating and extracting stream in constant memory (roughly one block,
 independent of archive or member size), and every archive carries a SHA-256
-of the reconstructed original, verified on extract -- corruption is always
+of the reconstructed original, verified on extract, so corruption is always
 detected and reported (streaming extraction is not yet atomic, so already-
 written files may remain on failure).
 

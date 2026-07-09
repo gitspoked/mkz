@@ -1,2 +1,2 @@
-bin/mkz
+@bin bin/mkz
 @man man/man1/mkz.1

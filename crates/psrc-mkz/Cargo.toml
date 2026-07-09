@@ -1,6 +1,6 @@
 [package]
 name = "mkz"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 description = "Streaming file compressor (bounded memory for typical text/logs): a reversible autocol pre-pass into zstd, with a never-worse safe gate and a SHA-256 integrity gate. Smaller on logs/CSV/JSONL; bit-exact; never larger than zstd alone."
@@ -16,7 +16,7 @@ path = "src/main.rs"
 
 [dependencies]
 # path+version so it builds in-tree AND is publishable to crates.io
-autocol = { path = "../psrc-autocol", version = "0.1.0" }
+autocol = { path = "../psrc-autocol", version = "0.1.2" }
 zstd = { workspace = true }
 sha2 = { workspace = true }
 anyhow = { workspace = true }

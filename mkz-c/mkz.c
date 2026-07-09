@@ -1,14 +1,14 @@
-/* mkz.c — C mkz CLI. Creates and extracts .mkz archives (PAS1 container + autocol/zstd
+/* mkz.c - C mkz CLI. Creates and extracts .mkz archives (PAS1 container + autocol/zstd
  * blocks + tar-style entry stream), byte-compatible with the Rust mkz.
  *
  *   mkz -c[z[LEVEL]][v] -f <archive> <files-or-dirs...>   create
  *   mkz -x[v]           -f <archive> [destdir]            extract (default dest ".")
  *
  * Both directions stream line-oriented input in bounded memory for typical text/logs: peak
- * memory ≈ one block, matching the Rust mkz. Newline-free input is the exception — a block is
+ * memory ~ one block, matching the Rust mkz. Newline-free input is the exception: a block is
  * read up to the next newline, so a file with no newlines is buffered whole and not yet
  * bounded. Create runs the autocol pre-pass per block behind a never-worse gate; extract
- * verifies the SHA-256 trailer before declaring success — but streams entries to disk first,
+ * verifies the SHA-256 trailer before declaring success, but streams entries to disk first,
  * so a corrupt trailer can leave already-written output (extraction is not yet atomic).
  *
  * SPDX-License-Identifier: MIT OR Apache-2.0
@@ -19,10 +19,10 @@
 #include <string.h>
 #include <sys/stat.h>
 
-#define MKZ_VERSION "0.1.0"
+#define MKZ_VERSION "0.1.2"
 
 static const char *HELP =
-    "mkz (C) — create/extract psrc-autocol/zstd (PAS1) archives\n"
+    "mkz (C) - create/extract psrc-autocol/zstd (PAS1) archives\n"
     "usage:\n"
     "  mkz -c[z[LEVEL]][v] -f <archive> <files-or-dirs...>   create\n"
     "  mkz -x[v]           -f <archive> [destdir]            extract (default dest: \".\")\n"

@@ -10,15 +10,15 @@
 //! ```
 //!
 //! A reversible, bit-exact pre-pass that makes zstd measurably smaller on structured/line
-//! data, and is provably never worse anywhere else. Everything streams: peak memory ≈ one
-//! block for typical line-oriented input. Newline-free input is the exception — a block
+//! data, and is provably never worse anywhere else. Everything streams: peak memory ~ one
+//! block for typical line-oriented input. Newline-free input is the exception: a block
 //! extends to the next newline, so a file with no newlines is buffered whole and not yet
 //! bounded.
 //!
 //! Layers:
-//!   - codec (`compress_stream`/`decompress_stream`): a byte stream ⇄ a `PAS1` container —
+//!   - codec (`compress_stream`/`decompress_stream`): a byte stream <-> a `PAS1` container:
 //!     line-aligned blocks, per-block autocol+zstd with a never-worse gate, streaming SHA-256.
-//!   - archive (`ArchiveReader`/`ArchiveSink`): a directory tree ⇄ a flat entry byte stream,
+//!   - archive (`ArchiveReader`/`ArchiveSink`): a directory tree <-> a flat entry byte stream,
 //!     fed through the codec. 
 //!
 //! Entry := [tag u8 0=file/1=dir][uvarint pathlen][path][file: uvarint size + bytes].
@@ -51,7 +51,7 @@ fn env_zstd_level() -> i32 {
         .unwrap_or(DEFAULT_ZSTD_LEVEL)
 }
 
-// ── varint ──────────────────────────────────────────────────────────────────
+// -- varint ------------------------------------------------------------------
 fn write_uvarint<W: Write>(w: &mut W, mut n: u64) -> io::Result<()> {
     loop {
         let b = (n & 0x7f) as u8;
@@ -107,7 +107,7 @@ fn uvarint_slice(s: &[u8]) -> Option<(u64, usize)> {
     }
 }
 
-// ── codec: byte stream ⇄ PAS1 container ───────────────────────────────────────
+// -- codec: byte stream <-> PAS1 container ---------------------------------------
 fn read_block<R: BufRead>(r: &mut R, target: usize) -> io::Result<Vec<u8>> {
     let mut buf = Vec::new();
     r.by_ref().take(target as u64).read_to_end(&mut buf)?;
@@ -155,11 +155,11 @@ fn compress_stream<R: BufRead, W: Write>(r: &mut R, w: &mut W, block: usize, lev
             break;
         }
         hasher.update(&data);
-        let comp_raw = zstd::encode_all(&data[..], level).context("zstd (raw block)")?;
+        let comp_raw = zstd::bulk::compress(&data[..], level).context("zstd (raw block)")?;
         let comp_raw_len = comp_raw.len();
         let ac = autocol::encode(&data);
         let (flags, payload) = if autocol::try_decode(&ac).as_deref() == Some(&data[..]) {
-            let comp_ac = zstd::encode_all(&ac[..], level).context("zstd (autocol block)")?;
+            let comp_ac = zstd::bulk::compress(&ac[..], level).context("zstd (autocol block)")?;
             if comp_ac.len() < comp_raw.len() {
                 (1u8, comp_ac)
             } else {
@@ -188,7 +188,7 @@ fn decompress_stream<R: Read, W: Write>(r: &mut R, w: &mut W) -> Result<()> {
     let mut magic = [0u8; 4];
     r.read_exact(&mut magic).context("reading magic")?;
     if &magic != MAGIC {
-        bail!("bad magic — not a PAS1 stream");
+        bail!("bad magic: not a PAS1 stream");
     }
     let mut hasher = Sha256::new();
     loop {
@@ -216,7 +216,7 @@ fn decompress_stream<R: Read, W: Write>(r: &mut R, w: &mut W) -> Result<()> {
         let backend = zstd::decode_all(&payload[..]).context("zstd decode")?;
         let block = if flags[0] == 1 {
             autocol::try_decode(&backend)
-                .ok_or_else(|| anyhow::anyhow!("autocol decode failed — corrupt block"))?
+                .ok_or_else(|| anyhow::anyhow!("autocol decode failed: corrupt block"))?
         } else {
             backend
         };
@@ -229,12 +229,12 @@ fn decompress_stream<R: Read, W: Write>(r: &mut R, w: &mut W) -> Result<()> {
     let mut sha = [0u8; 32];
     r.read_exact(&mut sha).context("reading sha256 trailer")?;
     if hasher.finalize().as_slice() != sha {
-        bail!("integrity check FAILED: SHA-256 mismatch — refusing corrupt output");
+        bail!("integrity check FAILED: SHA-256 mismatch, refusing corrupt output");
     }
     Ok(())
 }
 
-// ── archive: directory tree ⇄ flat entry byte stream ──────────────────────────
+// -- archive: directory tree <-> flat entry byte stream --------------------------
 struct Entry {
     is_dir: bool,
     rel: String,
@@ -293,7 +293,7 @@ fn walk(dir: &Path, out: &mut Vec<Entry>) -> Result<()> {
 }
 
 /// `Read` that streams the flat entry byte stream: header, then file content, per entry.
-/// Bounded working set — only one file handle open at a time.
+/// Bounded working set: only one file handle open at a time.
 struct ArchiveReader {
     entries: std::vec::IntoIter<Entry>,
     header: Cursor<Vec<u8>>,
@@ -345,7 +345,7 @@ enum SinkState {
     Body { remaining: u64, out: BufWriter<File> },
 }
 /// `Write` sink that parses the entry stream and reconstructs the tree under `dest`.
-/// Buffers only headers (file content streams straight to disk); peak ≈ one codec block.
+/// Buffers only headers (file content streams straight to disk); peak ~ one codec block.
 struct ArchiveSink {
     dest: PathBuf,
     buf: Vec<u8>,
@@ -466,7 +466,7 @@ fn extract(archive: &str, dest: &str, verbose: bool) -> Result<()> {
     Ok(())
 }
 
-// ── CLI (tar-style) ───────────────────────────────────────────────────────────
+// -- CLI (tar-style) -----------------------------------------------------------
 const HELP: &str = concat!(
     "mkz ", env!("CARGO_PKG_VERSION"), " (psrc)\n",
     "A reversible, bit-exact pre-pass that makes zstd measurably smaller on structured/line\n",
@@ -620,7 +620,7 @@ mod tests {
         create(archive.to_str().unwrap(), &[src.to_str().unwrap().to_string()], 1 << 16, 12, false).unwrap();
         extract(archive.to_str().unwrap(), dst.to_str().unwrap(), false).unwrap();
 
-        // src abs path safe_rel'd under dst — recompute the stored root
+        // src abs path safe_rel'd under dst, recompute the stored root
         let root = dst.join(safe_rel(&src));
         assert_eq!(std::fs::read(root.join("a.log")).unwrap(), b"alpha\nalpha\nbeta\n");
         assert_eq!(std::fs::read(root.join("logs/b.log")).unwrap(), vec![0u8, 1, 2, 255, b'\n', 7]);

@@ -1,4 +1,4 @@
-/* pas1.c — PAS1 stream container for mkz (C port). RAW blocks (zstd) + SHA-256 trailer.
+/* pas1.c - PAS1 stream container for mkz (C port). RAW blocks (zstd) + SHA-256 trailer.
  * Format-identical to the Rust mkz container. The decoder is the security surface:
  * every untrusted length/offset is bounds- and overflow-checked before use.
  * SPDX-License-Identifier: MIT OR Apache-2.0
@@ -77,8 +77,8 @@ static int read_uvarint(const uint8_t *in, size_t in_len, size_t *pos, uint64_t 
     }
 }
 
-/* Decompress ONE zstd frame of a-priori-unknown size (Rust's encode_all does not pledge the
- * content size into the frame header) into a malloc'd buffer, bomb-capped. 0 / -1. */
+/* Decompress ONE zstd frame of a-priori-unknown size (the decoder does not rely on a pledged
+ * content size; some archives omit it) into a malloc'd buffer, bomb-capped. 0 / -1. */
 static int zstd_grow(const uint8_t *src, size_t src_len, uint8_t **out, size_t *out_len) {
     ZSTD_DStream *ds = ZSTD_createDStream();
     if (!ds) return -1;
@@ -159,8 +159,8 @@ int mkz_pas1_encode_block(const uint8_t *data, size_t len, int level,
     return mkz_pas1_encode_block_stats(data, len, level, flags, payload, payload_len, NULL);
 }
 
-/* Decode ONE block payload back to its original bytes. zstd-decompress (streaming, since the
- * frame content size isn't pledged), then autocol-decode if flags&1, then verify the result
+/* Decode ONE block payload back to its original bytes. zstd-decompress (streaming, so a
+ * pledged frame content size is not required), then autocol-decode if flags&1, then verify the result
  * length equals the declared orig_len. mallocs *out (caller frees). 0 / -1. The decoder is
  * the security surface: orig_len is bomb-capped here; the caller bounds comp_len/payload_len
  * against the actual input. */
@@ -191,7 +191,7 @@ int mkz_pas1_compress(const uint8_t *data, size_t len, int zstd_level, size_t bl
     size_t off = 0;
     while (off < len) {
         /* line-aligned block: take up to block_size, then extend through the next '\n'
-         * (so a block holds whole lines — the autocol transform needs that). Matches the
+         * (so a block holds whole lines, the autocol transform needs that). Matches the
          * Rust read_block. */
         size_t blk = (len - off < block_size) ? (len - off) : block_size;
         size_t end = off + blk;

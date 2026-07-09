@@ -1,4 +1,4 @@
-# mkz-c — a dependency-light C port of mkz (autocol + zstd, bit-compatible with the
+# mkz-c - a dependency-light C port of mkz (autocol + zstd, bit-compatible with the
 # Rust crate). Builds with cc + libzstd (+ libcrypto/LibreSSL for SHA-256, or a vendored
 # SHA-256). Targets Linux / *BSD (incl. OpenBSD) / macOS.
 #
@@ -9,7 +9,7 @@ CFLAGS  ?= -O2 -Wall -Wextra -Wpedantic -std=c11
 # zstd is the only hard external dep (SHA-256 is vendored in sha256.c).
 ZSTD := $(shell pkg-config --cflags --libs libzstd 2>/dev/null || echo -lzstd)
 
-V       ?= 0.1.0
+V       ?= 0.1.2
 PREFIX  ?= /usr/local
 BINDIR  ?= $(PREFIX)/bin
 MANDIR  ?= $(PREFIX)/man/man1
@@ -36,7 +36,7 @@ test_b95u16: b95u16.c test_b95u16.c b95u16.h
 
 # --- container: PAS1 framing + libzstd + vendored SHA-256 (+ autocol for flags&1 blocks) ---
 test_pas1: pas1.c sha256.c autocol.c test_pas1.c pas1.h sha256.h autocol.h
-	$(CC) $(CFLAGS) -o $@ pas1.c sha256.c autocol.c test_pas1.c $(ZSTD)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -o $@ pas1.c sha256.c autocol.c test_pas1.c $(ZSTD)
 
 # --- transform: autocol decode, built with sanitizers (the decoder is the safety surface) ---
 test_autocol: autocol.c test_autocol.c autocol.h
