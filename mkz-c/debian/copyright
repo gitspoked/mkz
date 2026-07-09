@@ -1,7 +1,7 @@
 Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: mkz
-Upstream-Contact: Matthew Klein <maintainer@example.org>
-Source: https://example.org/mkz/
+Upstream-Contact: Matthew Klein <mk@ntele.net>
+Source: https://github.com/gitspoked/mkz
 
 Files: *
 Copyright: 2026 Matthew Klein

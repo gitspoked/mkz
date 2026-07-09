@@ -1,5 +1,5 @@
-mkz (0.1.0-1) unstable; urgency=medium
+mkz (0.1.2-1) unstable; urgency=medium
 
-  * Initial Debian packaging of the pure-C mkz (autocol pre-pass + zstd archiver).
+  * Initial Debian packaging of the pure-C mkz (autocol + zstd).
 
- -- Matthew Klein <maintainer@example.org>  Mon, 29 Jun 2026 00:00:00 +0000
+ -- Matthew Klein <mk@ntele.net>  Thu, 09 Jul 2026 21:07:41 +0000
