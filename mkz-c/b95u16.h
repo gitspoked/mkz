@@ -1,4 +1,4 @@
-/* b95u16.h — base-95-of-UTF-16 text encoding for mkz (C port).
+/* b95u16.h - base-95-of-UTF-16 text encoding for mkz (C port).
  *
  * UTF-16 code unit (u16) <-> exactly 3 printable-ASCII bytes (95^3 = 857375 > 65536).
  * Lossless incl. lone surrogates (operates on raw u16, never a "string"), sortable in

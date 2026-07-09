@@ -1,8 +1,8 @@
-/* base95.h — fixed-width base-95 integer encoding for mkz (C port).
+/* base95.h - fixed-width base-95 integer encoding for mkz (C port).
  *
  * u64 -> exactly 10 printable-ASCII bytes (0x20..0x7E), lossless (95^10 > 2^64),
  * lexicographically sortable (memcmp == numeric). Byte-identical to the Rust
- * `psrc_autocol`/`mkz` base-95 encoder — this is the interop contract.
+ * `psrc_autocol`/`mkz` base-95 encoder; this is the interop contract.
  *
  * SPDX-License-Identifier: MIT OR Apache-2.0
  */

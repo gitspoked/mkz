@@ -1,4 +1,4 @@
-/* b95u16.c — base-95-of-UTF-16 text encoding for mkz (C port).
+/* b95u16.c - base-95-of-UTF-16 text encoding for mkz (C port).
  * Byte-identical to the Rust psrc_autocol b95u16 module.
  * SPDX-License-Identifier: MIT OR Apache-2.0
  */

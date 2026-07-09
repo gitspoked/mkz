@@ -1,4 +1,4 @@
-/* archive.c — tar-style entry-stream unpack for mkz (C port).
+/* archive.c - tar-style entry-stream unpack for mkz (C port).
  * SPDX-License-Identifier: MIT OR Apache-2.0
  */
 #include "archive.h"
@@ -114,10 +114,10 @@ int mkz_archive_extract(const uint8_t *es, size_t es_len, const char *dest, int 
     return 0;
 }
 
-/* ───────────────────────── create side (tree -> entry stream) ─────────────────────────
+/* ------------------------- create side (tree -> entry stream) -------------------------
  * Mirrors the Rust ArchiveReader: a flat byte stream of entries, each directory emitted
  * before its (name-sorted) children, paths normalized to relocatable rel paths (leading
- * root / "." / ".." components dropped). Builds the whole stream in memory — consistent
+ * root / "." / ".." components dropped). Builds the whole stream in memory, consistent
  * with the in-memory reader (v1); streaming create is future work.
  */
 
@@ -227,7 +227,7 @@ static int emit_file(struct ebuf *es, const char *abspath, const char *rel, int 
 
 #define MKZ_REL_MAX 8192
 
-/* ── entry collection (shared by the in-memory build and the streaming source) ──
+/* -- entry collection (shared by the in-memory build and the streaming source) --
  * Walks `paths` into a flat list in the canonical order (each dir before its name-sorted
  * children), rel paths normalized; files carry their abs path + stat size, dirs abs==NULL. */
 

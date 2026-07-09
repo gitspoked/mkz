@@ -1,12 +1,12 @@
-/* stream.c — streaming create/extract for mkz (C port); bounded memory for typical text/logs.
+/* stream.c - streaming create/extract for mkz (C port); bounded memory for typical text/logs.
  *
  * Create: a pull-based entry-stream generator (one file open at a time) feeds a line-aligned
  * block reader; each block goes through mkz_pas1_encode_block (raw + autocol gate) and is
  * framed straight to the output FILE*, hashing incrementally. Extract: a buffered FILE reader
  * pulls one framed block at a time, mkz_pas1_decode_block reconstructs it, and a streaming sink
- * writes entries to disk as their bytes arrive — then the SHA-256 trailer is verified.
+ * writes entries to disk as their bytes arrive, then the SHA-256 trailer is verified.
  *
- * Peak memory ≈ one block for typical line-oriented input; a newline-free file is buffered
+ * Peak memory ~ one block for typical line-oriented input; a newline-free file is buffered
  * whole and not yet bounded. The decode path is the security surface; it reuses the audited
  * mkz_pas1_decode_block + mkz_safe_join guards.
  *
@@ -23,7 +23,7 @@
 #define MKZ_CHUNK   (1u << 16)   /* 64 KiB working chunk */
 #define MKZ_PATHBUF 8192         /* dest/rel build buffer (mkz_safe_join caps rel < 2048) */
 
-/* ── growable byte buffer ── */
+/* -- growable byte buffer -- */
 struct sbuf { uint8_t *d; size_t len, cap; };
 static int sb_reserve(struct sbuf *b, size_t total) {
     if (total <= b->cap) return 0;
@@ -54,7 +54,7 @@ static int uv_slice(const uint8_t *s, size_t n, uint64_t *out, size_t *adv) {
     }
 }
 
-/* ════════════════════════════ CREATE ════════════════════════════ */
+/* ============================ CREATE ============================ */
 
 /* Pull-based entry-stream source: serves header bytes then file body bytes per entry,
  * with a small pushback buffer so the block reader can line-align without byte-at-a-time IO. */
@@ -246,7 +246,7 @@ done:
     return rc;
 }
 
-/* ════════════════════════════ EXTRACT ════════════════════════════ */
+/* ============================ EXTRACT ============================ */
 
 struct frdr { FILE *f; uint64_t pos, size; };
 static int fr_exact(struct frdr *r, uint8_t *buf, size_t n) {

@@ -1,4 +1,4 @@
-/* base95.c — fixed-width base-95 integer encoding for mkz (C port).
+/* base95.c - fixed-width base-95 integer encoding for mkz (C port).
  * Byte-identical to the Rust psrc_autocol base-95 encoder.
  * SPDX-License-Identifier: MIT OR Apache-2.0
  */

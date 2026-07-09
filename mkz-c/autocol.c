@@ -1,4 +1,4 @@
-/* autocol.c — psrc-autocol decode (C port). Format-identical to Rust psrc_autocol.
+/* autocol.c - psrc-autocol decode (C port). Format-identical to Rust psrc_autocol.
  * Untrusted input: every length/offset/index is bounds-checked; structures are calloc'd
  * so the single cleanup path frees safely from any failure point.
  * SPDX-License-Identifier: MIT OR Apache-2.0
@@ -227,7 +227,7 @@ done:
     return ret;
 }
 
-/* ════════════════════════════ ENCODE ════════════════════════════
+/* ============================ ENCODE ============================
  * Faithful port of Rust psrc_autocol::encode. Output is byte-identical to `mkz transform`.
  * Input is our own (trusted) bytes; the security-critical surface is decode, above.
  */
@@ -254,7 +254,7 @@ static int bytes_cmp(const uint8_t *a, size_t an, const uint8_t *b, size_t bn) {
     return an < bn ? -1 : 1;
 }
 
-/* ── byte-string hash map (chaining). Keys are BORROWED — never freed by the map. ── */
+/* -- byte-string hash map (chaining). Keys are BORROWED, never freed by the map. -- */
 struct hnode {
     const uint8_t *key; size_t klen;
     uint64_t u0;    /* gmap: gid ;  vmap: frequency */
@@ -365,7 +365,7 @@ oom:
     return -1;
 }
 
-/* try to parse a column as canonical non-negative i64 decimals (no leading zeros, ≤18 digits).
+/* try to parse a column as canonical non-negative i64 decimals (no leading zeros, <=18 digits).
  * Returns 1 + sets *out (owned) on success; 0 (no parse / OOM) with *out = NULL otherwise. */
 static int try_ints(const struct str *col, size_t n, int64_t **out) {
     *out = NULL;

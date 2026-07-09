@@ -1,17 +1,17 @@
 # Debian packaging for `mkz`
 
 A `debian/` skeleton that builds a `.deb` from the upstream tarball using debhelper.
-The C sources, `Makefile`, and `mkz.1` man page are reused unchanged — this dir is just
+The C sources, `Makefile`, and `mkz.1` man page are reused unchanged; this dir is just
 the Debian metadata.
 
 ```
 debian/
-├── control          # source + binary package metadata, deps
-├── rules            # debhelper (dh); overrides install paths to /usr
-├── changelog        # version (0.1.0-1) — the source of truth for the package version
-├── copyright        # DEP-5, dual MIT / Apache-2.0
-├── source/format    # 3.0 (quilt) — non-native (upstream tarball + debian/)
-└── README.debian.md # this file
+|-- control          # source + binary package metadata, deps
+|-- rules            # debhelper (dh); overrides install paths to /usr
+|-- changelog        # version (0.1.0-1), the source of truth for the package version
+|-- copyright        # DEP-5, dual MIT / Apache-2.0
+|-- source/format    # 3.0 (quilt), non-native (upstream tarball + debian/)
+`-- README.debian.md # this file
 ```
 
 ## Why it's small
@@ -22,7 +22,7 @@ debian/
 - The upstream `Makefile` honors `CPPFLAGS`/`CFLAGS`/`LDFLAGS`, so `dpkg-buildflags`
   hardening (RELRO, PIE, FORTIFY) applies automatically.
 - The runtime dependency on `libzstd1` is computed automatically by `dh_shlibdeps`
-  (`${shlibs:Depends}`) — nothing to hand-list.
+  (`${shlibs:Depends}`), nothing to hand-list.
 
 ## Build (non-native, 3.0 quilt)
 

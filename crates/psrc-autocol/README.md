@@ -2,7 +2,7 @@
 # autocol
 
 A schema-free auto-columnar transform: a reversible, bit-exact pre-pass that makes general
-compressors (zstd, brotli) 15–50% smaller on structured, line-oriented data (logs, CSV,
+compressors (zstd, brotli) 15-50% smaller on structured, line-oriented data (logs, CSV,
 JSONL, telemetry). It discovers record structure with no schema and reorganizes rows into
 per-column streams.
 
@@ -17,7 +17,7 @@ plain codec.
    (hex/uuid stay whole, so no template explosion).
 3. Group records by skeleton (separator sequence). Within a group, token positions that
    are constant fold into a template; positions that vary become columns.
-4. Pack `[templates][record→template ids][columns]` into one stream, so the backend sees
+4. Pack `[templates][record->template ids][columns]` into one stream, so the backend sees
    per-column-homogeneous data (all status codes together, monotone timestamps
    delta-coded). Numeric columns get a zigzag-varint delta transform.
 
@@ -27,8 +27,8 @@ amortizes per-stream overhead. `decode(encode(x)) == x` always (B009-verified).
 ## Benchmarks
 
 Ratio = `compressed / original` (lower is better). Baselines are zstd -19 and brotli -q11
-(the strongest standard settings). `ac→zs` / `ac→br` are the same backends run on the
-transformed blob. `eff` = `min(zstd, brotli, ac→zs, ac→br)`, the safe-gated result you'd
+(the strongest standard settings). `ac->zs` / `ac->br` are the same backends run on the
+transformed blob. `eff` = `min(zstd, brotli, ac->zs, ac->br)`, the safe-gated result you'd
 actually ship. `win%` = `eff` vs the best plain codec. Every file is verified bit-exact.
 
 ### Reproducible corpus #
@@ -104,7 +104,7 @@ Some markdown, configs (`.ts`, `.py`, `.rs`, `.go`, `.md`, `.tsx`), plus a
 couple of binaries (`.pyc`, git `.idx`, cache blobs).
 
 0 of 40 beat the best plain codec, and 0 of 40 lost. Free-form text and code have no
-record skeleton, so the transformed blob compresses worse (`ac→brotli` ran about 40–60%
+record skeleton, so the transformed blob compresses worse (`ac->brotli` ran about 40-60%
 larger than plain). The safe gate fell back to the best plain codec on every file: net
 0.0% saved, 0.0% lost, all bit-exact.
 
@@ -114,20 +114,20 @@ it at a source tree expecting wins, but it won't make anything larger if you do.
 
 ### String-heavy tables, Parquet, and the "pre-tokenization" question
 
-Tested against a real Parquet export: a 167-row × 27-column `companies` table, mostly
+Tested against a real Parquet export: a 167-row x 27-column `companies` table, mostly
 string columns (names, domains, URLs, locations). Ratios vs the CSV (raw text) form:
 
 | approach                                      | ratio |
 |-----------------------------------------------|---------|
 | Parquet, re-encoded brotli-11 (max)           | 0.509 |
 | plain brotli -q11 on the CSV                  | 0.216 |
-| autocol → brotli (gate falls back)            | 0.250 |
-| per-column dictionary "tokenization" → brotli | 0.208 |
+| autocol -> brotli (gate falls back)            | 0.250 |
+| per-column dictionary "tokenization" -> brotli | 0.208 |
 
 // Each a case where it does not help:
 
-- Plain brotli beats Parquet about 2.4× here (and about 15× on a 14-row table). These
-  exports are small: the Parquet footer alone is 25–67% of the file. Parquet needs
+- Plain brotli beats Parquet about 2.4x here (and about 15x on a 14-row table). These
+  exports are small: the Parquet footer alone is 25-67% of the file. Parquet needs
   MB-scale data to amortize its metadata; below that, a general compressor on the raw
   text wins outright.
 
@@ -157,8 +157,8 @@ better than both autocol could and, at these sizes: Parquet too. But, it will se
 The numbers above come from `psrc-corpus`, the benchmark harness of the PSRC research
 workspace this crate grew out of; the harness and its generated corpus are not published
 with the crate. To check the claims independently: take your own line-oriented corpus
-(logs, CSV, JSONL), compress each file with plain zstd, then with autocol -> zstd — the
-[`mkz`](https://crates.io/crates/mkz) CLI does exactly this, never-worse gate included —
+(logs, CSV, JSONL), compress each file with plain zstd, then with autocol -> zstd (the
+[`mkz`](https://crates.io/crates/mkz) CLI does exactly this, never-worse gate included)
 and compare sizes. Ratios are independent of build profile: the transform output is
 byte-deterministic and the compression backends are external.
 

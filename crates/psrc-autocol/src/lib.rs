@@ -1,32 +1,32 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-//! psrc-autocol — schema-free auto-columnar transform.
+//! psrc-autocol - schema-free auto-columnar transform.
 //!
 //! A reversible, SHA-256-verifiable transform that discovers record structure in
 //! line-oriented data **with no schema** and reorganizes it so a downstream entropy
 //! coder (brotli/zstd) sees per-column-homogeneous data instead of interleaved rows.
 //!
-//! It is *not* a compressor on its own — it is the structural pre-pass that makes a
+//! It is *not* a compressor on its own; it is the structural pre-pass that makes a
 //! general compressor win on logs/CSV/JSONL/telemetry. [`encode`] produces a single
 //! packed blob; [`decode`] inverts it exactly. The caller runs the blob through the
 //! backend compressor and applies a safe gate (`min(backend(blob), backend(raw))`),
-//! so the arrangement can only help or no-op — never expand.
+//! so the arrangement can only help or no-op, never expand.
 //!
 //! ## How it works
 //! 1. Split on `\n` into records.
 //! 2. Tokenize each record into maximal ASCII-alphanumeric **words** and the
-//!    **separators** between them. Whole-token (so hex/uuid stay intact — no template
+//!    **separators** between them. Whole-token (so hex/uuid stay intact, no template
 //!    explosion).
 //! 3. Group records by **skeleton** (their separator sequence). Within a group, a word
 //!    position that is constant across all records is folded into the **template**;
 //!    positions that vary become **columns**.
-//! 4. Pack `[templates][record→template ids][columns]` into one blob. Numeric columns
+//! 4. Pack `[templates][record->template ids][columns]` into one blob. Numeric columns
 //!    get a zigzag-varint **delta** transform (timestamps/ids); others stay raw.
 //!
 //! The win comes from per-column homogeneity (all status codes together, monotone
 //! timestamps delta-coded) plus single-stream packing (one backend call amortizes
-//! per-stream overhead). Measured 20–44% over brotli -q11 on real logs, bit-exact.
+//! per-stream overhead). Measured 20-44% over brotli -q11 on real logs, bit-exact.
 
-// ── varint / zigzag ──────────────────────────────────────────────────────────
+// -- varint / zigzag ----------------------------------------------------------
 
 fn put_uvarint(out: &mut Vec<u8>, mut n: u64) {
     loop {
@@ -67,7 +67,7 @@ fn unzigzag(z: u64) -> i64 {
     ((z >> 1) as i64) ^ -((z & 1) as i64)
 }
 
-/// Byte length of `n` encoded as a uvarint — used to pick the cheapest per-column codec.
+/// Byte length of `n` encoded as a uvarint, used to pick the cheapest per-column codec.
 fn uvarint_len(mut n: u64) -> usize {
     let mut c = 1;
     while n >= 0x80 {
@@ -81,7 +81,7 @@ fn uvarint_len(mut n: u64) -> usize {
 /// backs the dict-ref column codec (codec id `2`).
 const FORMAT_VERSION: u8 = 1;
 
-// ── tokenization ─────────────────────────────────────────────────────────────
+// -- tokenization -------------------------------------------------------------
 
 #[inline]
 fn is_word_byte(b: u8) -> bool {
@@ -150,7 +150,7 @@ fn try_ints(col: &[&[u8]]) -> Option<Vec<i64>> {
     Some(out)
 }
 
-// ── encode ───────────────────────────────────────────────────────────────────
+// -- encode -------------------------------------------------------------------
 
 /// Transform `data` into the packed auto-columnar blob. Pure and reversible.
 pub fn encode(data: &[u8]) -> Vec<u8> {
@@ -224,11 +224,11 @@ pub fn encode(data: &[u8]) -> Vec<u8> {
         }
     }
 
-    // ── per-column codec selection: raw(0) | delta(1) | dict-ref(2) ──
+    // -- per-column codec selection: raw(0) | delta(1) | dict-ref(2) --
     // Build a tentative frequency-ranked value dictionary spanning ALL columns, then pick
     // the smallest pre-coder encoding per column. dict-ref shares one global dictionary, so
     // a column's dict cost is just its id stream. A monotone-numeric column's deltas are
-    // tiny varints and beat its (large, distinct) ids, so it keeps delta — the automatic
+    // tiny varints and beat its (large, distinct) ids, so it keeps delta; the automatic
     // guard against deduping incompressible numeric columns (the shutdown_monitor lesson).
     let mut freq: HashMap<&[u8], u64> = HashMap::new();
     for col in &columns {
@@ -263,7 +263,7 @@ pub fn encode(data: &[u8]) -> Vec<u8> {
         });
         let dict_sz: usize = col.iter().map(|&v| uvarint_len(tent_id[v])).sum();
         // prefer delta on ties with raw (keeps numeric homogeneity); take dict only if it is
-        // strictly smaller than both — so a numeric column never loses its delta to the dict.
+        // strictly smaller than both, so a numeric column never loses its delta to the dict.
         let mut best = raw_sz;
         let mut codec = ColCodec::Raw;
         if let Some(ds) = delta_sz {
@@ -279,7 +279,7 @@ pub fn encode(data: &[u8]) -> Vec<u8> {
     }
 
     // Final dictionary: only the values actually referenced by dict-ref columns, re-ranked
-    // (frequent → small id) for compact varints and deterministic output.
+    // (frequent -> small id) for compact varints and deterministic output.
     let mut used: std::collections::HashSet<&[u8]> = std::collections::HashSet::new();
     for (col, codec) in columns.iter().zip(&chosen) {
         if matches!(codec, ColCodec::Dict) {
@@ -345,7 +345,7 @@ pub fn encode(data: &[u8]) -> Vec<u8> {
     blob
 }
 
-// ── decode ───────────────────────────────────────────────────────────────────
+// -- decode -------------------------------------------------------------------
 
 enum Slot {
     Const(Vec<u8>),
@@ -367,8 +367,8 @@ fn read_bytes(buf: &[u8], pos: &mut usize) -> Option<Vec<u8>> {
 fn parse_template(rec: &[u8]) -> Option<Tmpl> {
     let mut pos = 0;
     let nword = get_uvarint(rec, &mut pos)? as usize;
-    // cap pre-alloc: each word/sep consumes ≥1 byte, so a crafted nword can't exceed the
-    // template bytes left — bound it instead of allocating (capacity-overflow panic).
+    // cap pre-alloc: each word/sep consumes >=1 byte, so a crafted nword can't exceed the
+    // template bytes left; bound it instead of allocating (capacity-overflow panic).
     let cap = nword.min(rec.len().saturating_sub(pos));
     let mut seps = Vec::with_capacity(cap + 1);
     let mut slots = Vec::with_capacity(cap);
@@ -398,15 +398,15 @@ pub fn try_decode(blob: &[u8]) -> Option<Vec<u8>> {
 
     // templates
     let ntmpl = get_uvarint(blob, &mut pos)? as usize;
-    // cap pre-alloc by bytes left: each template consumes ≥1 byte, so a crafted huge ntmpl
-    // cannot legitimately exceed the remaining input — bound it instead of panicking.
+    // cap pre-alloc by bytes left: each template consumes >=1 byte, so a crafted huge ntmpl
+    // cannot legitimately exceed the remaining input; bound it instead of panicking.
     let mut templates = Vec::with_capacity(ntmpl.min(blob.len().saturating_sub(pos)));
     for _ in 0..ntmpl {
         let rec = read_bytes(blob, &mut pos)?;
         templates.push(parse_template(&rec)?);
     }
 
-    // record → template ids
+    // record -> template ids
     let nlines = get_uvarint(blob, &mut pos)? as usize;
     let mut line_gid = Vec::with_capacity(nlines.min(blob.len().saturating_sub(pos)));
     for _ in 0..nlines {
@@ -502,7 +502,7 @@ pub fn decode(blob: &[u8]) -> Vec<u8> {
     try_decode(blob).expect("psrc-autocol: malformed blob")
 }
 
-// ── tests ──────────────────────────────────────────────────────────────────--
+// -- tests --------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests {
@@ -537,7 +537,7 @@ mod tests {
             );
         }
         roundtrip(&d);
-        // it should actually find structure (≥1 template, ≥1 column)
+        // it should actually find structure (>=1 template, >=1 column)
         let blob = encode(&d);
         assert!(blob.len() < d.len() * 2);
     }

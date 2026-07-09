@@ -14,9 +14,9 @@ mkz -x[v]           -f <archive> [destdir]            # extract (default dest: "
 
 | Path | What it is |
 |---|---|
-| [`crates/psrc-mkz`](crates/psrc-mkz) | the `mkz` CLI (Rust) — [crates.io/crates/mkz](https://crates.io/crates/mkz) |
-| [`crates/psrc-autocol`](crates/psrc-autocol) | the `autocol` library — [crates.io/crates/autocol](https://crates.io/crates/autocol) |
-| [`mkz-c`](mkz-c) | pure-C port of the tool (cc + libzstd, nothing else) — byte-compatible with the Rust build in both directions |
+| [`crates/psrc-mkz`](crates/psrc-mkz) | the `mkz` CLI (Rust), [crates.io/crates/mkz](https://crates.io/crates/mkz) |
+| [`crates/psrc-autocol`](crates/psrc-autocol) | the `autocol` library, [crates.io/crates/autocol](https://crates.io/crates/autocol) |
+| [`mkz-c`](mkz-c) | pure-C port of the tool (cc + libzstd, nothing else), byte-compatible with the Rust build in both directions |
 
 The `psrc-` prefix marks the crates' origin in the PSRC compression research project;
 `mkz` and `autocol` are its shippable products.

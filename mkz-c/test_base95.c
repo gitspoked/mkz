@@ -1,4 +1,4 @@
-/* test_base95.c — verify the C base-95 codec is byte-identical to Rust mkz.
+/* test_base95.c - verify the C base-95 codec is byte-identical to Rust mkz.
  * Anchors: Rust test_zero (0 -> 10 spaces) and test_one (1 -> 9 spaces + '!').
  * SPDX-License-Identifier: MIT OR Apache-2.0
  */

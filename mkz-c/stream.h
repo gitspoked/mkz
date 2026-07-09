@@ -1,6 +1,6 @@
-/* stream.h — streaming create/extract for mkz (C port); bounded memory for typical text/logs.
+/* stream.h - streaming create/extract for mkz (C port); bounded memory for typical text/logs.
  *
- * Both directions process the archive one block at a time: peak memory ≈ one block
+ * Both directions process the archive one block at a time: peak memory ~ one block
  * (plus the entry list, which scales with file COUNT not size). Bounded for typical
  * line-oriented input, matching the Rust mkz; pathological newline-free input is buffered
  * whole and not yet bounded. The CLI uses these; the in-memory

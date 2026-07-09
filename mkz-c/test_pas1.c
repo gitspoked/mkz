@@ -1,4 +1,4 @@
-/* test_pas1.c — SHA-256 vectors + PAS1 container C<->C roundtrip + the paranoid
+/* test_pas1.c - SHA-256 vectors + PAS1 container C<->C roundtrip + the paranoid
  * decoder's rejections. SPDX-License-Identifier: MIT OR Apache-2.0
  */
 #include "pas1.h"

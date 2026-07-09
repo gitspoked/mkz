@@ -1,4 +1,4 @@
-/* test_acenc.c — read a file, run mkz_autocol_encode, write the blob.
+/* test_acenc.c - read a file, run mkz_autocol_encode, write the blob.
  * Used to diff the C blob byte-for-byte against `mkz transform` (the Rust oracle) and to
  * feed `mkz untransform` (Rust decode of a C-produced blob). Built with sanitizers.
  *   test_acenc <input> <out.ac>

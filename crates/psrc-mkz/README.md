@@ -17,7 +17,7 @@ compressed archive, `-x` extracts it.
 ## Numbers
 
 Real macOS `/var/log` files, measured with the PSRC benchmark harness. Ratio is
-compressed ÷ original (lower is better); every file was verified bit-exact.
+compressed / original (lower is better); every file was verified bit-exact.
 
 |                        |  zstd | mkz ac |   %   |
 | files tested           | alone | > zstd |smaller|
@@ -67,7 +67,7 @@ mkz untransform app.log.ac  app.log
   it over the whole stream and reports corruption on a mismatch, so corruption is caught.
   Extraction streams to disk first and is not yet atomic, so a corrupt trailer can leave
   already-written files (temp+rename is planned).
-- Never worse. Each block ships whichever is smaller of `autocol→zstd` and `zstd`. If
+- Never worse. Each block ships whichever is smaller of `autocol->zstd` and `zstd`. If
   the transform doesn't help, the block is plain zstd, and output is never larger than
   zstd alone.
 - Bounded memory for typical text/logs. Streaming, line-aligned blocks: peak RAM is about
@@ -85,7 +85,7 @@ mkz untransform app.log.ac  app.log
 3. Code each column with the best of `{raw, zigzag-delta, global-dictionary}`, chosen
    per column, so a monotone timestamp column stays delta-coded and doesn't get
    dictionary-poisoned.
-4. Pack `[templates][row→template ids][value dict][columns]` into one blob, then zstd it.
+4. Pack `[templates][row->template ids][value dict][columns]` into one blob, then zstd it.
 
 Reversible by construction (`decode(encode(x)) == x`), checked by property tests and
 fuzzing.
@@ -95,7 +95,7 @@ fuzzing.
 | environment variabl  | default | effect                                           |
 |----------------------|---------|--------------------------------------------------|
 | `PSRC_AC_BLOCK_MB`   |   `16`  | block size; bigger = deeper columns, more memory |
-| `PSRC_AC_ZSTD_LEVEL` |   `12`  | zstd level 1–22; higher = smaller and slower     |
+| `PSRC_AC_ZSTD_LEVEL` |   `12`  | zstd level 1-22; higher = smaller and slower     |
 
 ## Scope
 

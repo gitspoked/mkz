@@ -1,4 +1,4 @@
-/* test_autocol.c — decode a Rust-produced autocol blob and compare to the original.
+/* test_autocol.c - decode a Rust-produced autocol blob and compare to the original.
  * usage: test_autocol <blob.ac> <expected>   (blob = output of `mkz transform expected blob.ac`)
  * Built with -fsanitize=address,undefined so the decoder is exercised for memory safety.
  * SPDX-License-Identifier: MIT OR Apache-2.0

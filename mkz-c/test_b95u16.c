@@ -1,4 +1,4 @@
-/* test_b95u16.c — verify the C b95u16 codec is byte-identical to Rust mkz.
+/* test_b95u16.c - verify the C b95u16 codec is byte-identical to Rust mkz.
  * SPDX-License-Identifier: MIT OR Apache-2.0
  */
 #include "b95u16.h"

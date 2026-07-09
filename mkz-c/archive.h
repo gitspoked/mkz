@@ -1,4 +1,4 @@
-/* archive.h — tar-style entry-stream unpack for mkz (C port).
+/* archive.h - tar-style entry-stream unpack for mkz (C port).
  *
  * The entry stream (the byte stream a PAS1 archive carries) is a flat concatenation of
  * entries: [tag u8: 0=file/1=dir][uvarint pathlen][path][file only: uvarint size + content].

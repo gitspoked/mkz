@@ -1,4 +1,4 @@
-/* pas1.h — PAS1 stream container for mkz (C port): byte stream <-> framed zstd blocks
+/* pas1.h - PAS1 stream container for mkz (C port): byte stream <-> framed zstd blocks
  * + SHA-256 trailer. Byte-format-identical to the Rust mkz compress_stream/decompress_stream.
  *
  * Compress applies the autocol pre-pass per block behind a never-worse gate (autocol only

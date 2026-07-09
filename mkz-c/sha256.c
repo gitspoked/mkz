@@ -1,4 +1,4 @@
-/* sha256.c — one-shot SHA-256 (FIPS 180-4). Public-domain.
+/* sha256.c - one-shot SHA-256 (FIPS 180-4). Public-domain.
  * SPDX-License-Identifier: MIT OR Apache-2.0
  */
 #include "sha256.h"
