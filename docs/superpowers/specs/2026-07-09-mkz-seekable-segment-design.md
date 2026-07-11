@@ -35,16 +35,24 @@ A new sealed segment format (working name PAS2, or a flagged PAS1 successor):
 
 ```
  "PAS2"  magic                     <- new marker; old readers MUST reject cleanly
- [ blocks ... ]                    <- UNCHANGED zstd/autocol blocks, still size-gated
- [ KEY DIRECTORY ]                 <- sorted canonical keys (base95/b95u16),
-                                       sparse: each entry -> (block, row-in-block),
-                                       supports exact seek AND ordered range
+ [ block: sync marker + CRC + data ]   <- each block self-contained: a recognizable
+ [ block: sync marker + CRC + data ]      start marker + per-block checksum, then the
+ [ ... ]                                   UNCHANGED zstd/autocol payload, still size-gated
+ [ INDEX SEGMENTS ]                <- one or more TYPED segments (kind #1 = sorted key
+                                       directory: canonical base95/b95u16 keys, sparse,
+                                       each entry -> (block, row-in-block), exact seek AND
+                                       ordered range). Fixed-width, contiguous, byte-
+                                       comparable. Future kinds: per-block integrity map,
+                                       secondary index, vector/ANN index - all additive.
  [ SCHEMA HEADER ]                 <- column names + count, key column index, key type
- [ FOOTER ]                        <- offsets/sizes of directory + schema, flags
- [ 32-byte SHA-256 ]               <- integrity, as today
+                                       (open type enum: int/text/raw + reserved vector/blob)
+ [ FOOTER ]                        <- offsets/sizes of segments + schema, flags, at a known
+                                       tail offset (read the end first, then map/seek)
+ [ 32-byte SHA-256 ]               <- whole-archive integrity, as today (coexists with
+                                       the per-block checksums, which enable partial recovery)
 ```
 
-Read path (no full decode): read footer -> jump to schema + directory -> binary-search
+Read path (no full decode): read footer -> jump to schema + index segments -> binary-search
 the sorted keys (zero decompression for existence / range / ordered iteration) ->
 decompress only the one block a hit points at -> return the row(s). Honest boundary:
 **key queries = zero decode; fetching a value = one block.**
@@ -75,7 +83,7 @@ Newline-delimited text, CSV as the headline case (also TSV/JSONL/SQL-INSERT). mk
 database-agnostic: `DB -> text export -> sealed seekable mkz segment`. mkz never parses
 proprietary DB files (`.ibd`/`.mdf`/`.dbf` are opaque pages - a poor fit, autocol no-ops).
 
-## The seven decisions to bake in (so any SQL adapter is a plugin, not a format change)
+## The decisions to bake in (so adapters AND future capabilities are plugins, not format changes)
 
 Every candidate host links a C/C++/.NET reader and wants the same things:
 
@@ -93,8 +101,59 @@ Every candidate host links a C/C++/.NET reader and wants the same things:
 6. **Keep per-column decode possible** (do not force materializing every column) - this
    is what lets DuckDB/Postgres do projection pushdown later. Not required in v1; just
    do not preclude it.
-7. **Treat the directory as a general index segment** so a secondary index (a second
-   seekable column) is another instance later, not a redesign.
+7. **Index segments are typed and pluggable, not a hardcoded directory.** The footer lists
+   index segments, each tagged with a `kind`: sorted-key directory is kind #1; a secondary
+   index, a per-block integrity map, or a vector/ANN index are later kinds slotted into the
+   same additive footer real estate - not a redesign. Old/unknown-kind readers reject
+   loudly (pairs with the roadmap "reject unknown flag bits").
+8. **Values are binary-safe, and the type system is open.** The value path is length-
+   delimited and byte-clean (not "everything is newline-delimited text"), and the column
+   type enum is open with reserved codes (`int`/`text`/`raw` today; reserved `vector<f32,d>`
+   / `blob` / `float`). This is the vector-and-model-weights door: an embedding is a fixed-
+   width blob, a checkpoint is name -> raw tensor bytes (a safetensors-shaped SSTable), so
+   storing them later is a value/type addition, not a format change. Nearness/range indexing
+   over vectors is a future index-segment `kind` (decision #7); the sorted scalar directory
+   deliberately does not try to serve it (no total order preserves nearness in high-D).
+9. **DMA-friendly physical layout (Chris's AI chip).** Keep directory/key slots fixed-width,
+   contiguous, and byte-comparable so access is constant-stride. Prefer power-of-2 sizes and
+   alignment (16/32/64/128 B): a 32-byte slot is one 256-bit HBM/AXI beat. base95's raw
+   10-byte / 3-byte widths are the awkward non-power-of-2 sizes that force burst splitting
+   (30-50% penalty), so **pad the key slot to 16/32 B if it is ever DMA-consumed.** An
+   accelerator has no MMU (DMA, not mmap), so this "DMA-friendly" property is the governing
+   one; zero-copy mmap on a CPU host is a bonus that the same fixed-width layout also gives.
+   Never trade fixed width away for variable-length/delta-encoded keys to save space -
+   that destroys both strideability and in-place binary search.
+
+## Resilience and recovery (mkzfix)
+
+mkz is block-structured, so unlike a single continuous DEFLATE/gzip stream (where one bad
+bit desyncs the rest and cannot resync), a damaged block need not destroy the others. Today
+that potential is unrealized: the only integrity is one whole-archive SHA-256 - all-or-nothing
+detection that neither identifies the bad block nor blesses the good ones. This design cashes
+the potential in, the way `bzip2recover` does for bzip2:
+
+- **Per-block sync markers.** Each block starts with a recognizable marker so a recovery
+  scan can find block boundaries even when the tail footer/index is the damaged part (the
+  footer is otherwise a single point of failure). bzip2 does exactly this (its block magic).
+- **Per-block checksums.** So "this block is intact" is *trustworthy*, not merely "it
+  decompressed without erroring" (corrupt data often decompresses to plausible garbage).
+  Carried as an index-segment kind (decision #7), outside the compressed data.
+- **Self-contained blocks (invariant).** Recovery requires no cross-block shared dictionary
+  or carried state - losing one block must not poison its neighbors. This is an additional
+  reason the ~3% cross-block dictionary gain was rejected: block independence is a capability.
+- **`mkzfix` - a separate recovery utility** (like `bzip2recover`, not part of the core
+  reader): scan a damaged archive, find blocks via markers, keep every block that verifies,
+  rebuild the directory, re-seal a fresh valid mkz, and **loudly report the holes** - never
+  present a partial as whole. The seekable directory makes the report precise: Family A =
+  intact members + a manifest of lost ones; Family B = surviving key ranges + named gaps
+  ("recovered keys 0-3999 and 4064-10000, lost 4000-4063").
+- **Loss granularity = block size**, so block size is a resilience knob (smaller = finer
+  recovery, more overhead) - expose it.
+
+This ties the threads together: sync markers + per-block CRC + the seekable directory +
+block independence all sit OUTSIDE the compressed data (additive, never-worse-gate-safe) and
+together give seek, recover, AND OTA-update friendliness from one structure. (FEC for a lossy
+transmission channel is a heavier, separate concern - out of scope here.)
 
 ## SQL host friendliness (informs priorities, not required for v1)
 
@@ -126,8 +185,13 @@ traditional RDBMSs stream rows out of a function but resist pushing the predicat
 - C and Rust must both implement it and produce byte-identical segments. The directory
   must be deterministic (base95/b95u16 are already byte-exact across impls/arch).
 - Old readers must reject the new format cleanly - pairs with the roadmap item "reject
-  unknown block-flag bits loudly."
-- The never-worse gate still governs the data blocks; the directory is outside it.
+  unknown block-flag bits loudly." Unknown index-segment kinds are rejected the same way.
+- The never-worse gate still governs the data blocks; the index segments (directory,
+  per-block integrity, etc.) are outside it.
+- **Blocks are self-contained** - no cross-block dictionary or carried state - so a single
+  block can be decoded, verified, and recovered independently.
+- **Fixed-width, byte-comparable, power-of-2-aligned** key/directory slots (DMA-friendly;
+  see decision #9). Never break the fixed-width invariant.
 
 ## Suggested phasing (refine in writing-plans)
 
@@ -138,7 +202,11 @@ traditional RDBMSs stream rows out of a function but resist pushing the predicat
 3. **Adapter + secondary indexes**: a SQLite virtual-table adapter as the demo of
    `WHERE key=...` pushdown; generalize the directory for secondary indexes; enable
    per-column (projection) decode.
-4. **Later**: DuckDB and Postgres adapters.
+4. **Resilience**: per-block sync markers + per-block checksum index segment, self-contained
+   block enforcement, and the `mkzfix` recovery utility. (Marker/checksum framing is cheap
+   and could land as early as Phase 1; the tool follows once the directory exists.)
+5. **Later**: DuckDB and Postgres adapters; vector/ANN index segment; per-column projection
+   decode; DMA-consumption path (padded power-of-2 key slots) if a chip target materializes.
 
 ## Open questions (resolve before/into writing-plans)
 
@@ -150,3 +218,11 @@ traditional RDBMSs stream rows out of a function but resist pushing the predicat
 - Row-in-block addressing granularity (per-row offsets vs re-scan within the block).
 - Where `libmkz` lives (grow the existing C port into a linkable library; Rust FFI or
   parallel Rust reader).
+- Block sync-marker format (value/width) and how a recovery scan disambiguates it from
+  payload bytes; per-block checksum algorithm (CRC32 vs xxh3) and where it lives relative
+  to the block and the whole-archive SHA-256.
+- Typed index-segment header layout (kind tag, version, offset/size) shared across
+  sorted-key / integrity / future secondary + vector kinds.
+- Key-slot padding policy: keep native base95 widths (10/3 B) for CPU/disk, or pad to
+  power-of-2 (16/32 B) unconditionally for a single DMA-ready layout - decide if/when a
+  chip target is real (the DMA-friendly lens; the Qubed chip work).
