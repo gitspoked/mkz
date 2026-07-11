@@ -191,6 +191,27 @@ Keep per-block checksums/markers behind an optional flag so pure-archival mode p
 Pattern: engines built to query external files push `WHERE key=...` into a seek; the big
 traditional RDBMSs stream rows out of a function but resist pushing the predicate in.
 
+## Scope and identity (where mkz ends and Qubed begins)
+
+This segment is deliberately the top of mkz's identity, no further. Think concentric rings; the
+handoff to Qubed is a specific seam, not a vibe:
+
+- Ring 0 - archiver core: PAS1 blocks, entry stream, codecs, integrity. Content-agnostic.
+- Ring 1 - better archiver: brotli/codec registry, recovery/mkzfix, tar/gz/zst extraction, and the
+  seekable path/filename directory (Family A, a proper central directory).
+- Ring 2 - keyed columnar store: schema + designated key column (Family B) + per-column codecs,
+  keyed on base95/b95u16. **Rings 0-2 are all mkz** and the foundation others build on.
+- Ring 3+ - NOT mkz: vector/ANN nearness seek, JIT, model routing/inference, SQL pushdown. These
+  CONSUME a Ring-2 segment but live in Qubed / adapters.
+
+Two lines: crossing "just an archiver" -> "keyed columnar store" (Ring 1/2) is intended, not a
+deviation; the product handoff to Qubed is the Ring 2/3 seam. base95/b95u16 are the frozen,
+SHARED key ABI - identical bytes in mkz's Ring-2 keys and Qubed's base format - so a Ring-2 mkz
+segment is natively what Qubed indexes. Discipline that keeps this from mutating the format: the
+keyed schema/directory always rides as ADDITIVE typed segments outside the compressed blocks, so
+0.1.2 archives stay byte-valid forever and the archiver core stays content-agnostic (base95
+appears only in the keyed stratum, never in Rings 0-1).
+
 ## Non-goals
 
 - Not a live, mutable, transactional database. No in-place updates, no MVCC. Updates are
