@@ -155,6 +155,26 @@ block independence all sit OUTSIDE the compressed data (additive, never-worse-ga
 together give seek, recover, AND OTA-update friendliness from one structure. (FEC for a lossy
 transmission channel is a heavier, separate concern - out of scope here.)
 
+## Compression-ratio cost (firm figure)
+
+The payload ratio is UNCHANGED: data blocks are byte-for-byte the same zstd/autocol output
+as 0.1.2 and still governed by the never-worse gate. Everything this design adds is additive
+overhead alongside the blocks, not a regression on them.
+
+The shipping CLI default block is 16 MiB uncompressed (`DEFAULT_BLOCK_MB = 16`, override
+`PSRC_AC_BLOCK_MB`; PAS1's internal fallback is 1 MiB). Additive overhead is per-block:
+~8 B sync marker + ~8 B checksum (xxh3; 4 B CRC32) + one sparse directory entry (~32 B:
+padded 16 B key + block offset + len) ~= **48 B/block worst case**, plus a one-time ~270 B
+(magic + footer + schema; the 32 B SHA-256 already existed).
+
+Against a 16 MiB block (~3.5 MiB on disk at typical text ratios) that is ~1 part in 350,000:
+**under ~0.01% total overhead, effectively unmeasurable** (a 100 GiB corpus adds ~300 KB).
+Break-even for 1% overhead is a compressed block near ~4.8 KB, i.e. an uncompressed block of
+~20-25 KB - roughly 700x smaller than default; even dropping to 1 MiB blocks for finer
+recovery granularity costs only ~0.02%. The only cost that scales with data rather than block
+count is a Family-A directory over millions of tiny files (like any zip central directory).
+Keep per-block checksums/markers behind an optional flag so pure-archival mode pays nothing.
+
 ## SQL host friendliness (informs priorities, not required for v1)
 
 - **DuckDB** - friendliest: table function / extension, filter + projection pushdown
