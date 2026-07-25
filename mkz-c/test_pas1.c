@@ -3,6 +3,7 @@
  */
 #include "pas1.h"
 #include "sha256.h"
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -27,6 +28,19 @@ static void roundtrip(const uint8_t *data, size_t len, size_t block, const char 
     CHECK(de == 0 && blen == len && (len == 0 || memcmp(back, data, len) == 0), msg);
     free(comp);
     free(back);
+}
+
+static void test_reject_unknown_flag_bits(void) {
+    const uint8_t data[] = "reject unknown bits\n";
+    uint8_t *arc = NULL; size_t arc_len = 0;
+    assert(mkz_pas1_compress(data, sizeof data - 1, 3, 0, &arc, &arc_len) == 0);
+    /* MAGIC(4) tag(1) flags(1): block 0 flags byte is arc[5] */
+    assert(arc_len > 6 && arc[4] == 1);
+    arc[5] |= 0x02;                        /* reserved bit set; payload untouched */
+    uint8_t *out = NULL; size_t out_len = 0;
+    assert(mkz_pas1_decompress(arc, arc_len, &out, &out_len) == -1);
+    free(arc); free(out);
+    fprintf(stderr, "ok: unknown flag bits rejected\n");
 }
 
 int main(void) {
@@ -55,6 +69,9 @@ int main(void) {
     uint32_t s = 0x12345678u;
     for (size_t i = 0; i < n; i++) { s ^= s << 13; s ^= s >> 17; s ^= s << 5; big[i] = (uint8_t)s; }
     roundtrip(big, n, 4096, "incompressible roundtrip");
+
+    /* test unknown flag bits rejection */
+    test_reject_unknown_flag_bits();
 
     /* --- paranoid decoder rejections --- */
     uint8_t *comp = NULL, *back = NULL; size_t clen = 0, blen = 0;

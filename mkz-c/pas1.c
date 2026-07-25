@@ -167,6 +167,7 @@ int mkz_pas1_encode_block(const uint8_t *data, size_t len, int level,
 int mkz_pas1_decode_block(const uint8_t *payload, size_t payload_len, uint8_t flags,
                           uint64_t orig_len, uint8_t **out, size_t *out_len) {
     if (orig_len > MKZ_MAX_BLOCK_ORIG) return -1;
+    if (flags & (uint8_t)~1u) return -1;   /* reserved flag bits: newer archive or corrupt - refuse */
     uint8_t *backend = NULL; size_t blen = 0;
     if (zstd_grow(payload, payload_len, &backend, &blen)) return -1;
     if (flags & 1) {
