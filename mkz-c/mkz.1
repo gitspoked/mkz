@@ -134,6 +134,10 @@ and a trailing SHA-256 of the reconstructed original.
 .Sh AUTHORS
 .An Matthew Klein .
 .Sh CAVEATS
+Extract requires a seekable archive file;
+.Cm mkz -xf -
+(stdin) is refused with an explanatory error.
+.Pp
 Symbolic links and special files are skipped.
 Stored paths are normalized to be relocatable; extraction rejects absolute
 paths and

@@ -88,6 +88,9 @@ mkz -xf  logs.mkz                        # extract into the current dir
 
 Environment: `PSRC_AC_ZSTD_LEVEL` (default 12), `PSRC_AC_BLOCK_MB` (default 16).
 
+Extract requires a seekable archive file; `mkz -xf -` (stdin) is refused with an
+explanatory error.
+
 ## Streaming / memory
 
 Both create and extract stream line-oriented input in bounded memory for typical text/logs:

@@ -99,6 +99,12 @@ int main(int argc, char **argv) {
     } else {
         if (npos > 1) { fprintf(stderr, "mkz: extract takes at most one destdir\n"); free(pos); return 2; }
         const char *dest = npos ? pos[0] : ".";
+        if (strcmp(archive, "-") == 0) {
+            fprintf(stderr, "mkz: extract from stdin is not supported: the reader needs a "
+                            "seekable file to bound block payloads. Save to a file first.\n");
+            free(pos);
+            return 2;
+        }
         rc = mkz_extract_stream(archive, dest, verbose);
         if (rc) fprintf(stderr, "mkz: %s could not be extracted (not a valid PAS1 archive, or it uses features newer than this mkz)\n", archive);
         else    fprintf(stderr, "mkz: extracted %s -> %s (SHA-256 verified)\n", archive, dest);
