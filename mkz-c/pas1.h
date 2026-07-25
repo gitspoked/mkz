@@ -54,4 +54,22 @@ int mkz_pas1_encode_block(const uint8_t *data, size_t len, int level,
 int mkz_pas1_decode_block(const uint8_t *payload, size_t payload_len, uint8_t flags,
                           uint64_t orig_len, uint8_t **out, size_t *out_len);
 
+/* Reusable decode scratch for callers that decode many blocks in a loop (the streaming
+ * extractor). Reusing the same scratch across calls avoids rebuilding the decode buffers
+ * from empty every block: measured on this platform's allocator, that pattern leaves
+ * roughly one block's worth of resident memory behind PER BLOCK (never reclaimed until
+ * process exit), so peak RSS grew linearly with the number of blocks processed instead of
+ * staying flat (O(block), as intended). Create once per extraction, reuse for every block,
+ * free once when done. */
+struct mkz_pas1_scratch;
+struct mkz_pas1_scratch *mkz_pas1_scratch_new(void);
+void mkz_pas1_scratch_free(struct mkz_pas1_scratch *s);
+
+/* Same contract as mkz_pas1_decode_block, but reuses `scratch`'s buffers across calls.
+ * *out is BORROWED from scratch: valid until the next call on the same scratch, or until
+ * mkz_pas1_scratch_free. The caller must NOT free(*out). 0 / -1. */
+int mkz_pas1_decode_block_into(const uint8_t *payload, size_t payload_len, uint8_t flags,
+                               uint64_t orig_len, struct mkz_pas1_scratch *scratch,
+                               uint8_t **out, size_t *out_len);
+
 #endif /* MKZ_PAS1_H */

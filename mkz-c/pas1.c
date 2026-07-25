@@ -78,12 +78,17 @@ static int read_uvarint(const uint8_t *in, size_t in_len, size_t *pos, uint64_t 
 }
 
 /* Decompress ONE zstd frame of a-priori-unknown size (the decoder does not rely on a pledged
- * content size; some archives omit it) into a malloc'd buffer, bomb-capped. 0 / -1. */
-static int zstd_grow(const uint8_t *src, size_t src_len, uint8_t **out, size_t *out_len) {
+ * content size; some archives omit it) into `o`, bomb-capped. `o` is caller-owned: this
+ * function only appends to it (after resetting o->len), it never frees o->d. 0 / -1.
+ * Shared by zstd_grow (one-shot: fresh o->{0} per call) and zstd_grow_into (reused o across
+ * many calls, so a hot decode loop doesn't rebuild this buffer from empty every time - see
+ * the comment on mkz_autocol_decode_impl in autocol.c for why that matters). */
+static int zstd_grow_impl(const uint8_t *src, size_t src_len, struct buf *o,
+                          uint8_t **out, size_t *out_len) {
     ZSTD_DStream *ds = ZSTD_createDStream();
     if (!ds) return -1;
     ZSTD_initDStream(ds);
-    struct buf o = {0};
+    o->len = 0; /* reuse o->d/o->cap across calls; forget only the previous contents */
     ZSTD_inBuffer in = { src, src_len, 0 };
     uint8_t chunk[1 << 16];
     int rc = -1;
@@ -91,16 +96,31 @@ static int zstd_grow(const uint8_t *src, size_t src_len, uint8_t **out, size_t *
         ZSTD_outBuffer ob = { chunk, sizeof chunk, 0 };
         size_t r = ZSTD_decompressStream(ds, &ob, &in);
         if (ZSTD_isError(r)) goto done;
-        if (o.len + ob.pos > MKZ_MAX_BLOCK_ORIG) goto done; /* bomb cap */
-        if (buf_push(&o, chunk, ob.pos)) goto done;
+        if (o->len + ob.pos > MKZ_MAX_BLOCK_ORIG) goto done; /* bomb cap */
+        if (buf_push(o, chunk, ob.pos)) goto done;
         if (r == 0) break;                                  /* frame complete */
         if (ob.pos == 0 && in.pos == in.size) goto done;    /* truncated / no progress */
     }
-    *out = o.d; *out_len = o.len; o.d = NULL; rc = 0;
+    *out = o->d; *out_len = o->len; rc = 0;
 done:
     ZSTD_freeDStream(ds);
-    free(o.d);
     return rc;
+}
+
+/* One-shot: fresh buffer every call, caller frees *out. Unchanged contract for existing
+ * callers (the in-memory mkz_pas1_decompress path, tests). */
+static int zstd_grow(const uint8_t *src, size_t src_len, uint8_t **out, size_t *out_len) {
+    struct buf o = {0};
+    int rc = zstd_grow_impl(src, src_len, &o, out, out_len);
+    if (rc) { free(o.d); return rc; }
+    return 0; /* success: ownership of o.d (== *out) transfers to the caller */
+}
+
+/* Reused-scratch: `scratch` owns the buffer across many calls. *out is BORROWED from
+ * scratch - the caller must not free it. */
+static int zstd_grow_into(const uint8_t *src, size_t src_len, struct buf *scratch,
+                          uint8_t **out, size_t *out_len) {
+    return zstd_grow_impl(src, src_len, scratch, out, out_len);
 }
 
 /* zstd-compress one buffer at `level` into a malloc'd buffer. 0 / -1. */
@@ -178,6 +198,56 @@ int mkz_pas1_decode_block(const uint8_t *payload, size_t payload_len, uint8_t fl
         *out = plain; *out_len = plain_len;
     } else {
         if (blen != orig_len) { free(backend); return -1; }
+        *out = backend; *out_len = blen;
+    }
+    return 0;
+}
+
+/* Reusable decode scratch for a hot loop that calls mkz_pas1_decode_block_into once per
+ * block (the streaming extractor, stream.c): owns the zstd-decompress buffer and (lazily,
+ * only if any block actually needs autocol) the autocol decode buffer, both reused across
+ * calls instead of rebuilt from empty every time. See zstd_grow_impl / autocol.c's
+ * mkz_autocol_decode_impl for why that matters (measured, unbounded-with-block-count RSS
+ * growth from the naive per-call malloc/free pattern on this platform's allocator). */
+struct mkz_pas1_scratch {
+    struct buf zbuf;
+    struct mkz_ac_scratch *ac; /* NULL until the first flags&1 block; archives with only
+                                 * raw blocks never allocate it */
+};
+
+struct mkz_pas1_scratch *mkz_pas1_scratch_new(void) {
+    return (struct mkz_pas1_scratch *)calloc(1, sizeof(struct mkz_pas1_scratch));
+}
+
+void mkz_pas1_scratch_free(struct mkz_pas1_scratch *s) {
+    if (!s) return;
+    free(s->zbuf.d);
+    mkz_autocol_scratch_free(s->ac);
+    free(s);
+}
+
+/* Same contract as mkz_pas1_decode_block, but reuses `scratch`'s buffers across calls.
+ * *out is BORROWED (from scratch's zstd buffer for a raw block, or its autocol buffer for
+ * an autocol block): valid until the next call on the same scratch, or until
+ * mkz_pas1_scratch_free. The caller must NOT free(*out). 0 / -1. */
+int mkz_pas1_decode_block_into(const uint8_t *payload, size_t payload_len, uint8_t flags,
+                               uint64_t orig_len, struct mkz_pas1_scratch *scratch,
+                               uint8_t **out, size_t *out_len) {
+    if (orig_len > MKZ_MAX_BLOCK_ORIG) return -1;
+    if (flags & (uint8_t)~1u) return -1;   /* reserved flag bits: newer archive or corrupt - refuse */
+    uint8_t *backend = NULL; size_t blen = 0;
+    if (zstd_grow_into(payload, payload_len, &scratch->zbuf, &backend, &blen)) return -1;
+    if (flags & 1) {
+        if (!scratch->ac) {
+            scratch->ac = mkz_autocol_scratch_new();
+            if (!scratch->ac) return -1;
+        }
+        uint8_t *plain = NULL; size_t plain_len = 0;
+        int de = mkz_autocol_decode_into(backend, blen, scratch->ac, &plain, &plain_len);
+        if (de || plain_len != orig_len) return -1;
+        *out = plain; *out_len = plain_len;
+    } else {
+        if (blen != orig_len) return -1;
         *out = backend; *out_len = blen;
     }
     return 0;

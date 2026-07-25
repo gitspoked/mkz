@@ -51,16 +51,32 @@ static int ob_push(struct ob *b, const uint8_t *p, size_t n) {
     return 0;
 }
 
-int mkz_autocol_decode(const uint8_t *blob, size_t blob_len, uint8_t **out, size_t *out_len) {
+/* Reusable decode scratch (opaque to callers via autocol.h): just an `ob` whose buffer
+ * outlives a single mkz_autocol_decode_into call, so repeated calls reuse its capacity. */
+struct mkz_ac_scratch { struct ob ob; };
+
+/* Shared decode body for both mkz_autocol_decode and mkz_autocol_decode_into: `ob` is the
+ * output buffer, owned and grown by the CALLER (not this function). Reusing the same `ob`
+ * across many calls (resetting only ob->len, keeping ob->d/ob->cap) avoids rebuilding a
+ * large buffer from empty via malloc/realloc/free every call: that pattern was measured to
+ * leave roughly one buffer's worth of resident memory behind PER CALL on this platform's
+ * allocator (never reclaimed until process exit), so peak RSS grew without bound across a
+ * multi-block extraction instead of staying flat. On success, *out points INTO ob->d
+ * (borrowed - the caller does not own or free it directly; see the two wrappers below for
+ * how ownership is actually handled). On failure, ob->d/ob->cap are left as-is (whatever
+ * partial content is there is harmless garbage that the next call's ob->len = 0 discards). */
+static int mkz_autocol_decode_impl(const uint8_t *blob, size_t blob_len, struct ob *ob,
+                                   uint8_t **out, size_t *out_len) {
     struct rdr r = { blob, blob_len, 0 };
     struct tmpl *tmpls = NULL; size_t ntmpl = 0;
     size_t *gid = NULL; size_t nlines = 0;
     struct str *dict = NULL; size_t ndict = 0;
     struct col *cols = NULL; size_t ncol = 0;
     size_t *base = NULL, *cursor = NULL;
-    struct ob ob = {0};
     int ret = -1;
     uint64_t u;
+
+    ob->len = 0; /* reuse ob->d/ob->cap across calls; forget only the previous contents */
 
     /* version byte */
     if (r.pos >= r.len || blob[r.pos] != 1) goto done;
@@ -181,14 +197,14 @@ int mkz_autocol_decode(const uint8_t *blob, size_t blob_len, uint8_t **out, size
     cursor = (size_t *)calloc(ncol ? ncol : 1, sizeof *cursor);
     if (!cursor) goto done;
     for (size_t i = 0; i < nlines; i++) {
-        if (i) { uint8_t nl = '\n'; if (ob_push(&ob, &nl, 1)) goto done; }
+        if (i) { uint8_t nl = '\n'; if (ob_push(ob, &nl, 1)) goto done; }
         size_t g = gid[i];
         struct tmpl *T = &tmpls[g];
         size_t var_k = 0;
-        if (ob_push(&ob, T->seps[0].p, T->seps[0].n)) goto done;
+        if (ob_push(ob, T->seps[0].p, T->seps[0].n)) goto done;
         for (size_t j = 0; j < T->nword; j++) {
             if (T->slots[j].is_const) {
-                if (ob_push(&ob, T->slots[j].w.p, T->slots[j].w.n)) goto done;
+                if (ob_push(ob, T->slots[j].w.p, T->slots[j].w.n)) goto done;
             } else {
                 size_t col_idx = base[g] + var_k;
                 var_k++;
@@ -196,13 +212,13 @@ int mkz_autocol_decode(const uint8_t *blob, size_t blob_len, uint8_t **out, size
                 struct col *C = &cols[col_idx];
                 if (cursor[col_idx] >= C->n) goto done;
                 struct val *vv = &C->v[cursor[col_idx]++];
-                if (ob_push(&ob, vv->p, vv->n)) goto done;
+                if (ob_push(ob, vv->p, vv->n)) goto done;
             }
-            if (ob_push(&ob, T->seps[j + 1].p, T->seps[j + 1].n)) goto done;
+            if (ob_push(ob, T->seps[j + 1].p, T->seps[j + 1].n)) goto done;
         }
     }
 
-    *out = ob.d; *out_len = ob.len; ob.d = NULL;
+    *out = ob->d; *out_len = ob->len;
     ret = 0;
 
 done:
@@ -223,8 +239,35 @@ done:
     free(gid);
     free(base);
     free(cursor);
-    free(ob.d);
     return ret;
+}
+
+/* One-shot decode: fresh buffer every call, caller frees *out. Unchanged contract/behavior
+ * for existing callers (tests, `mkz untransform`, the in-memory mkz_pas1_decompress path). */
+int mkz_autocol_decode(const uint8_t *blob, size_t blob_len, uint8_t **out, size_t *out_len) {
+    struct ob ob = {0};
+    int rc = mkz_autocol_decode_impl(blob, blob_len, &ob, out, out_len);
+    if (rc) { free(ob.d); return rc; }
+    return 0; /* success: ownership of ob.d (== *out) transfers to the caller */
+}
+
+/* Reusable-scratch decode for hot loops that call this once per block (the streaming
+ * extractor): `scratch` owns a buffer that persists and grows across calls instead of being
+ * rebuilt from empty every time. *out is BORROWED from scratch - valid until the next call
+ * on the same scratch, or until mkz_autocol_scratch_free; the caller must not free(*out). */
+int mkz_autocol_decode_into(const uint8_t *blob, size_t blob_len, struct mkz_ac_scratch *scratch,
+                            uint8_t **out, size_t *out_len) {
+    return mkz_autocol_decode_impl(blob, blob_len, &scratch->ob, out, out_len);
+}
+
+struct mkz_ac_scratch *mkz_autocol_scratch_new(void) {
+    return (struct mkz_ac_scratch *)calloc(1, sizeof(struct mkz_ac_scratch));
+}
+
+void mkz_autocol_scratch_free(struct mkz_ac_scratch *s) {
+    if (!s) return;
+    free(s->ob.d);
+    free(s);
 }
 
 /* ============================ ENCODE ============================

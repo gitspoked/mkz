@@ -30,8 +30,10 @@ telemetry) and is never worse anywhere else:
    no-op.
 4. Frame the chosen payload into a `PAS1` container and append a streaming SHA-256 of the
    reconstructed original (the SHA-256 integrity gate). Extraction verifies this SHA-256 over
-   the whole stream and reports corruption on a mismatch; it is not yet atomic, so a corrupt
-   trailer can leave already-written files in place (temp+rename is planned for a future release).
+   the whole stream and reports corruption on a mismatch. Extraction is atomic: entries stage
+   into `<dest>/.mkz-partial.<pid>` and are placed into `<dest>` only after the SHA-256 trailer
+   verifies; a failed extraction places nothing in `<dest>` and leaves the staging directory
+   for inspection.
 
 Measured 20-44% smaller than plain zstd on real logs, bit-exact. On unstructured or
 already-compressed data it falls back to plain zstd, so it never loses.

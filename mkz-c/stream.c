@@ -442,6 +442,15 @@ int mkz_extract_stream(const char *archive, const char *dest, int verbose) {
     sink.dest = staging; sink.verbose = verbose;
     int rc = -1;
 
+    /* Reused across every block instead of mkz_pas1_decode_block mallocing a fresh ~block-
+     * size buffer each call: that per-call malloc/free pattern was measured to leave
+     * roughly one block's worth of resident memory behind PER BLOCK on this platform's
+     * allocator (never reclaimed until process exit), so peak RSS grew linearly with the
+     * number of blocks processed - i.e. with total archive size - instead of staying flat
+     * at O(block) as intended. See mkz_pas1_scratch's comment in pas1.h. */
+    struct mkz_pas1_scratch *scratch = mkz_pas1_scratch_new();
+    if (!scratch) { fclose(f); return -1; }
+
     uint8_t magic[4];
     if (fr_exact(&r, magic, 4) || memcmp(magic, "PAS1", 4) != 0) goto done;
     for (;;) {
@@ -459,14 +468,15 @@ int mkz_extract_stream(const char *archive, const char *dest, int verbose) {
         if (!payload) goto done;
         if (fr_exact(&r, payload, (size_t)comp_len)) { free(payload); goto done; }
 
+        /* `block` is borrowed from `scratch`, reused next iteration - do not free it. */
         uint8_t *block = NULL; size_t block_len = 0;
-        int de = mkz_pas1_decode_block(payload, (size_t)comp_len, flags, orig_len, &block, &block_len);
+        int de = mkz_pas1_decode_block_into(payload, (size_t)comp_len, flags, orig_len,
+                                            scratch, &block, &block_len);
         free(payload);
         if (de) goto done;
 
         mkz_sha256_update(&sha, block, block_len);
         int fe = sink_feed(&sink, block, block_len);
-        free(block);
         if (fe) goto done;
     }
 
@@ -500,6 +510,7 @@ done:
 cleanup:
     if (sink.fp) fclose(sink.fp);
     free(sink.buf.d);
+    mkz_pas1_scratch_free(scratch);
     fclose(f);
     return rc;
 }

@@ -15,11 +15,14 @@ mkz -xf  logs.mkz out/         # extract
 - Full parity with the Rust `mkz`: creates, reads, encodes, streams. Archives interop
   bit-exact both ways, and the C encoder is byte-identical to the Rust one.
 - Streaming, bounded memory (about one block) for typical line-oriented text/logs: 338 MB
-  in gives about 80 MB peak on create, about 16 MB on extract. Newline-free input is the
-  exception: it is buffered whole and not yet bounded.
+  in gives about 80 MB peak on create; extraction peaks at about 80 MB too, flat regardless
+  of input size (measured at 96 MB and 305 MB in; a 0.1.3 fix removed a per-block buffer
+  that used to make extract memory grow with total archive size instead of staying flat).
+  Newline-free input is the exception: it is buffered whole and not yet bounded.
 - Bit-exact and integrity-gated: every archive carries an SHA-256; extraction verifies it
-  over the whole stream and reports corruption on a mismatch. Extraction is not yet atomic,
-  so a corrupt trailer can leave already-written files (temp+rename is planned).
+  over the whole stream and reports corruption on a mismatch. Extraction is atomic: entries
+  stage into `<dest>/.mkz-partial.<pid>` and land in `<dest>` only after the SHA-256 trailer
+  verifies; a failed extraction places nothing and leaves the staging dir for inspection.
 - Audited decoder: untrusted bytes are fully bounds- and overflow-checked, path traversal
   is guarded, and it is ASan/UBSan-clean on valid and hostile input.
 - One hard dependency (libzstd); SHA-256 and base-95 are vendored. MIT OR Apache-2.0,

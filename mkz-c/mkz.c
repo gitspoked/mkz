@@ -20,7 +20,7 @@
 #include <string.h>
 #include <sys/stat.h>
 
-#define MKZ_VERSION "0.1.2"
+#define MKZ_VERSION "0.1.3"
 
 static const char *HELP =
     "mkz (C) - create/extract psrc-autocol/zstd (PAS1) archives\n"

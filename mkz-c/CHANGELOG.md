@@ -3,6 +3,32 @@
 Notable changes to mkz and autocol. Versions are SemVer; format loosely follows
 Keep a Changelog.
 
+## [0.1.3] - unreleased
+
+### mkz (both implementations)
+- Readers now REJECT blocks with unknown flag bits instead of silently decoding them as
+  plain zstd (forward-compat gate for codec ids and PAS2; settlement spec 2026-07-25).
+- Extraction is atomic: entries stream into `<dest>/.mkz-partial.<pid>` and are placed
+  into `<dest>` only after the SHA-256 trailer verifies. Failures leave the staging
+  directory for inspection and place nothing.
+- `mkz -xf -` (stdin) is refused with a clear message (the reader needs a seekable file).
+
+### C build
+- Fixed extraction memory that grew with total archive size instead of staying flat. The
+  streaming decoder rebuilt its per-block output buffers (`mkz_autocol_decode`'s
+  reconstruction buffer and `zstd_grow`'s decompression buffer) from empty via
+  malloc/realloc/free on every block instead of reusing them; on this platform's
+  allocator that left roughly one block's worth of resident memory behind per block,
+  never reclaimed until process exit. Both buffers are now reused across the whole
+  extraction (`mkz_pas1_decode_block_into` plus a per-extraction scratch freed once at
+  the end), so peak RSS is now genuinely O(block), independent of total archive size.
+  Measured peak RSS on extract: before the fix, 168 MB at a ~96 MB input, growing to
+  374 MB at a ~305 MB input (not bounded); after the fix, 82 MB at ~96 MB and 80 MB at
+  ~305 MB (flat).
+
+### docs
+- New REGISTRY.md at the repo root governs all format id spaces.
+
 ## [0.1.2] - 2026-07-09 (crates, C tool, and OpenBSD port unified on one version)
 
 ### mkz (both implementations)

@@ -44,8 +44,16 @@ so the transform can only help or no-op.
 Every archive carries a SHA-256 of the reconstructed original; extraction
 verifies this SHA-256 over the whole stream and reports corruption on a
 mismatch.
-Extraction is not yet atomic, so a corrupt trailer can leave already-written
-files in place; a future release will extract via a temporary path and rename.
+Extraction is atomic: entries are staged under a
+.Pa .mkz-partial. Ns Ar pid
+directory inside
+.Ar destdir
+and are placed into
+.Ar destdir
+only after the SHA-256 trailer verifies.
+A failed extraction places nothing in
+.Ar destdir ;
+the staging directory is left in place for inspection.
 .Pp
 Both creation and extraction stream line-oriented input in bounded memory for
 typical text and logs: peak memory is roughly one block.
