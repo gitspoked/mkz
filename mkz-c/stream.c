@@ -16,9 +16,13 @@
 #include "pas1.h"
 #include "archive.h"
 #include "sha256.h"
+#include <dirent.h>
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 #define MKZ_CHUNK   (1u << 16)   /* 64 KiB working chunk */
 #define MKZ_PATHBUF 8192         /* dest/rel build buffer (mkz_safe_join caps rel < 2048) */
@@ -353,6 +357,31 @@ static int sink_feed(struct sink *s, const uint8_t *data, size_t n) {
     return 0;
 }
 
+/* Move every entry under src into dst: directories are merged (mkz_mkdir_p + recurse),
+ * files are renamed over (atomic replace; staging lives under dest, same filesystem).
+ * Emptied source dirs are removed with rmdir (refuses non-empty). 0 / -1. */
+static int move_tree(const char *src, const char *dst) {
+    DIR *d = opendir(src);
+    if (!d) return -1;
+    struct dirent *e; int rc = 0;
+    while (rc == 0 && (e = readdir(d)) != NULL) {
+        if (strcmp(e->d_name, ".") == 0 || strcmp(e->d_name, "..") == 0) continue;
+        char from[MKZ_PATHBUF], to[MKZ_PATHBUF];
+        if ((size_t)snprintf(from, sizeof from, "%s/%s", src, e->d_name) >= sizeof from ||
+            (size_t)snprintf(to, sizeof to, "%s/%s", dst, e->d_name) >= sizeof to) { rc = -1; break; }
+        struct stat st;
+        if (lstat(from, &st)) { rc = -1; break; }
+        if (S_ISDIR(st.st_mode)) {
+            if (mkz_mkdir_p(to) || move_tree(from, to)) { rc = -1; break; }
+            rmdir(from);
+        } else {
+            if (rename(from, to)) { rc = -1; break; }
+        }
+    }
+    closedir(d);
+    return rc;
+}
+
 int mkz_extract_stream(const char *archive, const char *dest, int verbose) {
     FILE *f = fopen(archive, "rb");
     if (!f) return -1;
@@ -364,9 +393,18 @@ int mkz_extract_stream(const char *archive, const char *dest, int verbose) {
 
     if (mkz_mkdir_p(dest)) { fclose(f); return -1; }
 
+    /* Stream entries into a staging dir under dest first; only after the SHA-256 trailer
+     * verifies do we merge-move staging into dest (see move_tree below). A failure before
+     * that point leaves dest exactly as it was; the caller only ever sees "nothing was
+     * placed" for a failure that happens here. */
+    char staging[MKZ_PATHBUF];
+    if ((size_t)snprintf(staging, sizeof staging, "%s/.mkz-partial.%ld",
+                         dest, (long)getpid()) >= sizeof staging) { fclose(f); return -1; }
+    if (mkz_mkdir_p(staging)) { fclose(f); return -1; }
+
     struct mkz_sha256_ctx sha; mkz_sha256_init(&sha);
     struct sink sink = {0};
-    sink.dest = dest; sink.verbose = verbose;
+    sink.dest = staging; sink.verbose = verbose;
     int rc = -1;
 
     uint8_t magic[4];
@@ -402,11 +440,29 @@ int mkz_extract_stream(const char *archive, const char *dest, int verbose) {
         if (fr_exact(&r, want, 32)) goto done;
         if (r.pos != r.size) goto done;                    /* trailing garbage */
         mkz_sha256_final(&sha, got);
-        if (memcmp(want, got, 32) != 0) goto done;          /* SHA-256 mismatch: report failure (entries already written; not yet atomic) */
+        if (memcmp(want, got, 32) != 0) goto done;          /* SHA-256 mismatch: nothing placed (entries only ever reached staging) */
         if (sink.state != 0 || sink.fp != NULL || sink.buf.len != 0) goto done; /* truncated entry */
     }
+
+    /* SHA-256 verified: place the staged data into dest. move_tree failing here is a
+     * placement failure, NOT "nothing was placed" - some entries may already be in dest
+     * by the time it errors out (e.g. a pre-existing plain file where the archive has a
+     * directory, disk-full, permissions), so it gets its own, different message below. */
+    if (move_tree(staging, dest)) {
+        fprintf(stderr, "mkz: extraction FAILED while placing verified data into %s; "
+                        "a PARTIAL merge may have occurred. Remaining staged data left "
+                        "for inspection at %s\n", dest, staging);
+        goto cleanup;
+    }
+    if (rmdir(staging) != 0)   /* empty after the merge; never removes content */
+        fprintf(stderr, "mkz: warning: could not remove staging dir %s after extract: %s\n",
+                staging, strerror(errno));
     rc = 0;
+    goto cleanup;
 done:
+    fprintf(stderr, "mkz: extraction FAILED; nothing was placed in %s. "
+                    "Partial data left for inspection at %s\n", dest, staging);
+cleanup:
     if (sink.fp) fclose(sink.fp);
     free(sink.buf.d);
     fclose(f);

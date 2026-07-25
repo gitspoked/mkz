@@ -21,10 +21,12 @@ int mkz_create_stream(const char *const *paths, size_t npaths, const char *archi
                       int level, size_t block, int verbose);
 
 /* Extract: read PAS1 `archive` block-by-block, decode each block (zstd + autocol), stream the
- * reconstructed entries straight to files under `dest`, then verify the SHA-256 trailer
+ * reconstructed entries into a staging dir under `dest`, then verify the SHA-256 trailer
  * (and that the stream ended cleanly). Paranoid: the decode path bounds-checks everything and
- * the sink rejects path traversal. Returns 0 / -1; entries are written to disk before the
- * trailer is checked, so a failed check can leave already-written files (not yet atomic). */
+ * the sink rejects path traversal. Returns 0 / -1; atomic: entries are written to staging, not
+ * dest, so a failed check leaves dest untouched. Only after the trailer verifies is staging
+ * merge-moved into dest; the staging dir (.mkz-partial.<pid>) is retained and reported on any
+ * failure, including one during that final move. */
 int mkz_extract_stream(const char *archive, const char *dest, int verbose);
 
 #endif /* MKZ_STREAM_H */

@@ -7,9 +7,10 @@
  * Both directions stream line-oriented input in bounded memory for typical text/logs: peak
  * memory ~ one block, matching the Rust mkz. Newline-free input is the exception: a block is
  * read up to the next newline, so a file with no newlines is buffered whole and not yet
- * bounded. Create runs the autocol pre-pass per block behind a never-worse gate; extract
- * verifies the SHA-256 trailer before declaring success, but streams entries to disk first,
- * so a corrupt trailer can leave already-written output (extraction is not yet atomic).
+ * bounded. Create runs the autocol pre-pass per block behind a never-worse gate; extract is
+ * atomic: entries stream into a staging dir under destdir, the SHA-256 trailer is verified,
+ * and only then is staging merge-moved into destdir, so a corrupt trailer leaves destdir
+ * untouched.
  *
  * SPDX-License-Identifier: MIT OR Apache-2.0
  */

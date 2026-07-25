@@ -46,6 +46,10 @@ test_autocol: autocol.c test_autocol.c autocol.h
 test_acenc: autocol.c test_acenc.c autocol.h
 	$(CC) $(CFLAGS) -fsanitize=address,undefined -o $@ autocol.c test_acenc.c
 
+# --- streaming extract: atomicity via staging dir (verify SHA-256, then place) ---
+test_extract: stream.c pas1.c sha256.c autocol.c archive.c test_extract.c stream.h pas1.h sha256.h autocol.h archive.h
+	$(CC) $(CPPFLAGS) $(CFLAGS) -o $@ stream.c pas1.c sha256.c autocol.c archive.c test_extract.c $(ZSTD)
+
 # --- the CLI: create + extract real .mkz archives, streaming (bounded memory for typical text/logs) ---
 # Honors CPPFLAGS / CFLAGS / LDFLAGS so distro hardening flags (RELRO, PIE, FORTIFY) apply.
 mkz: mkz.c stream.c pas1.c sha256.c autocol.c archive.c stream.h pas1.h sha256.h autocol.h archive.h
@@ -56,10 +60,11 @@ mkz.asan: mkz.c stream.c pas1.c sha256.c autocol.c archive.c stream.h pas1.h sha
 	$(CC) $(CPPFLAGS) $(CFLAGS) -fsanitize=address,undefined -o $@ mkz.c stream.c pas1.c sha256.c autocol.c archive.c $(LDFLAGS) $(ZSTD)
 
 .PHONY: all check install uninstall dist clean
-check: test_base95 test_b95u16 test_pas1
+check: test_base95 test_b95u16 test_pas1 test_extract
 	./test_base95
 	./test_b95u16
 	./test_pas1
+	./test_extract
 
 install: mkz
 	mkdir -p $(DESTDIR)$(BINDIR) $(DESTDIR)$(MANDIR)
@@ -82,5 +87,5 @@ dist:
 	@echo "SIZE: `wc -c < $(DISTNAME).tar.gz` bytes"
 
 clean:
-	rm -f test_base95 test_b95u16 test_pas1 test_autocol test_acenc mkz mkz.asan *.o
+	rm -f test_base95 test_b95u16 test_pas1 test_extract test_autocol test_acenc mkz mkz.asan *.o
 	rm -rf $(DISTNAME) $(DISTNAME).tar.gz
