@@ -449,7 +449,7 @@ int mkz_extract_stream(const char *archive, const char *dest, int verbose) {
      * number of blocks processed - i.e. with total archive size - instead of staying flat
      * at O(block) as intended. See mkz_pas1_scratch's comment in pas1.h. */
     struct mkz_pas1_scratch *scratch = mkz_pas1_scratch_new();
-    if (!scratch) { fclose(f); return -1; }
+    if (!scratch) goto done;   /* OOM: report like any other failure here, nothing was placed */
 
     uint8_t magic[4];
     if (fr_exact(&r, magic, 4) || memcmp(magic, "PAS1", 4) != 0) goto done;

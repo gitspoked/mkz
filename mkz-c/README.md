@@ -98,9 +98,10 @@ explanatory error.
 Both create and extract stream line-oriented input in bounded memory for typical text/logs:
 peak memory is roughly one block (plus the entry list, which scales with file count, not
 size). Only one input file is open at a time. For example, a 338 MB log input compresses
-with about 80 MB peak RSS and extracts with about 16 MB. Pathological newline-free input is
-the exception: a block is read up to the next newline, so a file with no newlines is buffered
-whole and is not yet bounded (a 200 MB newline-free file peaked ~1 GB RSS).
+with about 80 MB peak RSS; extraction peaks around 80 MB too, flat regardless of input size
+(measured at 96 MB and 305 MB in). Pathological newline-free input is the exception: a block
+is read up to the next newline, so a file with no newlines is buffered whole and is not yet
+bounded (a 200 MB newline-free file peaked ~1 GB RSS).
 
 ## Safety
 
