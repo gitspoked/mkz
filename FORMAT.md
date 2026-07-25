@@ -53,8 +53,9 @@ autocol pre-pass for a block only when the transform verifiably round-trips AND
 `len(zstd(autocol(block))) < len(zstd(block))`; otherwise they emit the plain-zstd block
 with flags = 0. Any mix of gated/ungated blocks is a valid stream.
 
-**Reserved flag bits:** current readers ignore bits 1-7 (a future revision will reject
-them; see ROADMAP). Writers MUST NOT set them.
+**Reserved flag bits:** readers MUST reject a block whose flags byte has any bit other
+than bit 0 set (enforced since 0.1.3 in both implementations). Writers MUST NOT set
+reserved bits. Allocation of future flag bits is governed by REGISTRY.md.
 
 ---
 
@@ -134,5 +135,6 @@ groups decoding above 0xFFFF.
 
 - PAS1 has no version field; incompatible container changes will use a new magic.
 - The autocol blob carries an explicit version byte (currently 1).
-- Planned, format-affecting work (see ROADMAP.md): a brotli codec claiming flags bit 1,
-  and readers rejecting unknown flag bits.
+- Readers reject unknown flag bits since 0.1.3; this is the forward-compat gate that
+  future format work (codec ids, PAS2 segment kinds) relies on. Planned allocations live
+  in REGISTRY.md and ROADMAP.md.
