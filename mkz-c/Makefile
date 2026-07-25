@@ -19,7 +19,8 @@ INSTALL ?= install
 DISTNAME := mkz-$(V)
 DIST_SRC  := base95.c base95.h b95u16.c b95u16.h sha256.c sha256.h pas1.c pas1.h \
              autocol.c autocol.h archive.c archive.h stream.c stream.h mkz.c
-DIST_TEST := test_base95.c test_b95u16.c test_pas1.c test_autocol.c test_acenc.c
+DIST_TEST := test_base95.c test_b95u16.c test_pas1.c test_autocol.c test_acenc.c \
+             test_extract.c
 DIST_DOC  := Makefile README.md TLDR.md INSTALL install.sh \
              CHANGELOG.md SECURITY.md NOTICE COPYING mkz.1
 DIST_LIC  := LICENSE-MIT LICENSE-APACHE

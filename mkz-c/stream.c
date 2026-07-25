@@ -357,29 +357,64 @@ static int sink_feed(struct sink *s, const uint8_t *data, size_t n) {
     return 0;
 }
 
+/* move_tree recurses one stack frame per directory level of a VERIFIED-but-otherwise-
+ * untrusted archive (mkz_safe_join permits stored rel paths up to ~2000 bytes, i.e. up to
+ * ~1000 levels of single-char directory nesting). Cap the depth so a hostile archive can't
+ * exhaust the stack; deeper than this is treated as a move_tree failure (routes to the
+ * existing PARTIAL-merge message, same as any other placement failure). */
+#define MKZ_MOVE_TREE_MAX_DEPTH 256
+
 /* Move every entry under src into dst: directories are merged (mkz_mkdir_p + recurse),
  * files are renamed over (atomic replace; staging lives under dest, same filesystem).
- * Emptied source dirs are removed with rmdir (refuses non-empty). 0 / -1. */
-static int move_tree(const char *src, const char *dst) {
+ * Emptied source dirs are removed with rmdir (refuses non-empty). `depth` is the current
+ * nesting level (0 at the top call); past MKZ_MOVE_TREE_MAX_DEPTH, fails without
+ * recursing further. The from/to path buffers are heap-allocated per call, not stack
+ * arrays, precisely because this recurses per directory level: MKZ_PATHBUF (8192 B) x2
+ * as stack arrays would be ~16 KB per frame, which at a few hundred levels can exhaust a
+ * default (e.g. 8 MB) stack well before the depth cap above bites; on the heap, the same
+ * nesting only costs malloc'd bytes, not stack. 0 / -1. */
+static int move_tree_depth(const char *src, const char *dst, int depth) {
+    if (depth >= MKZ_MOVE_TREE_MAX_DEPTH) return -1;
     DIR *d = opendir(src);
     if (!d) return -1;
-    struct dirent *e; int rc = 0;
-    while (rc == 0 && (e = readdir(d)) != NULL) {
+    char *from = (char *)malloc(MKZ_PATHBUF);
+    char *to = (char *)malloc(MKZ_PATHBUF);
+    int rc = (from && to) ? 0 : -1;
+    struct dirent *e;
+    while (rc == 0) {
+        /* readdir() returns NULL both at end-of-directory and on error; errno is the
+         * only way to tell them apart, so it must be reset immediately before the call
+         * and read back immediately after, before anything else can clobber it. */
+        errno = 0;
+        e = readdir(d);
+        if (e == NULL) { if (errno != 0) rc = -1; break; }
         if (strcmp(e->d_name, ".") == 0 || strcmp(e->d_name, "..") == 0) continue;
-        char from[MKZ_PATHBUF], to[MKZ_PATHBUF];
-        if ((size_t)snprintf(from, sizeof from, "%s/%s", src, e->d_name) >= sizeof from ||
-            (size_t)snprintf(to, sizeof to, "%s/%s", dst, e->d_name) >= sizeof to) { rc = -1; break; }
+        if ((size_t)snprintf(from, MKZ_PATHBUF, "%s/%s", src, e->d_name) >= MKZ_PATHBUF ||
+            (size_t)snprintf(to, MKZ_PATHBUF, "%s/%s", dst, e->d_name) >= MKZ_PATHBUF) { rc = -1; break; }
         struct stat st;
         if (lstat(from, &st)) { rc = -1; break; }
         if (S_ISDIR(st.st_mode)) {
-            if (mkz_mkdir_p(to) || move_tree(from, to)) { rc = -1; break; }
+            if (mkz_mkdir_p(to) || move_tree_depth(from, to, depth + 1)) { rc = -1; break; }
+            /* Removing an already-moved entry's now-empty source dir while still
+             * iterating this same directory is the standard `rm -rf` walk pattern: only
+             * entries readdir() already handed back are touched, never ones not yet
+             * seen. POSIX leaves concurrent directory mutation during readdir()
+             * implementation-defined in general, but this restricted pattern (remove
+             * only what you already consumed) is safe on the filesystems mkz targets
+             * (ext4, APFS, UFS, ZFS, tmpfs, ...). */
             rmdir(from);
         } else {
             if (rename(from, to)) { rc = -1; break; }
         }
     }
+    free(from);
+    free(to);
     closedir(d);
     return rc;
+}
+
+static int move_tree(const char *src, const char *dst) {
+    return move_tree_depth(src, dst, 0);
 }
 
 int mkz_extract_stream(const char *archive, const char *dest, int verbose) {

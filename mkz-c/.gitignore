@@ -1,6 +1,7 @@
 test_base95
 test_b95u16
 test_pas1
+test_extract
 test_autocol
 test_acenc
 *.o
