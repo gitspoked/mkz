@@ -473,10 +473,30 @@ fn extract(archive: &str, dest: &str, verbose: bool) -> Result<()> {
     match decompress_stream(&mut r, &mut sink) {
         Ok(()) => {
             sink.flush().ok();
-            merge_move(&staging, &dest_path)?;
-            std::fs::remove_dir(&staging).ok(); // empty after the merge; never removes content
-            eprintln!("mkz: extracted {archive} -> {dest} (SHA-256 verified)");
-            Ok(())
+            // The SHA-256 trailer is verified at this point, but placement (the merge
+            // move) is a separate step that can still fail partway (e.g. a pre-existing
+            // plain file where the archive has a directory, disk-full, permissions).
+            // That must not be reported as "nothing was placed" - some entries may
+            // already be in dest by the time merge_move errors out.
+            match merge_move(&staging, &dest_path) {
+                Ok(()) => {
+                    if let Err(e) = std::fs::remove_dir(&staging) {
+                        eprintln!(
+                            "mkz: warning: could not remove staging dir {} after extract: {e}",
+                            staging.display()
+                        );
+                    }
+                    eprintln!("mkz: extracted {archive} -> {dest} (SHA-256 verified)");
+                    Ok(())
+                }
+                Err(e) => {
+                    eprintln!(
+                        "mkz: extraction FAILED while placing verified data into {dest}; a PARTIAL merge may have occurred. Remaining staged data left for inspection at {}",
+                        staging.display()
+                    );
+                    Err(e)
+                }
+            }
         }
         Err(e) => {
             sink.flush().ok();
@@ -491,7 +511,9 @@ fn extract(archive: &str, dest: &str, verbose: bool) -> Result<()> {
 
 /// Move every entry under src into dst: directories are merged (create_dir_all), files
 /// are renamed over (atomic replace on the same filesystem, which staging-under-dest
-/// guarantees). Emptied source dirs are removed with remove_dir (refuses non-empty).
+/// guarantees). Emptied source dirs are removed with remove_dir (refuses non-empty);
+/// a removal failure is a non-fatal warning, not an error - the move itself already
+/// succeeded.
 fn merge_move(src: &Path, dst: &Path) -> Result<()> {
     for entry in std::fs::read_dir(src).with_context(|| format!("read_dir {}", src.display()))? {
         let entry = entry?;
@@ -500,7 +522,9 @@ fn merge_move(src: &Path, dst: &Path) -> Result<()> {
         if entry.file_type()?.is_dir() {
             std::fs::create_dir_all(&to).with_context(|| format!("mkdir {}", to.display()))?;
             merge_move(&from, &to)?;
-            std::fs::remove_dir(&from).ok();
+            if let Err(e) = std::fs::remove_dir(&from) {
+                eprintln!("mkz: warning: could not remove emptied staging dir {}: {e}", from.display());
+            }
         } else {
             std::fs::rename(&from, &to)
                 .with_context(|| format!("rename {} -> {}", from.display(), to.display()))?;
@@ -721,6 +745,34 @@ mod tests {
             })
             .unwrap_or_default();
         assert!(visible.is_empty(), "partial entries leaked into dest: {visible:?}");
+
+        std::fs::remove_dir_all(&base).ok();
+    }
+
+    #[test]
+    fn merge_into_existing_dest() {
+        let base = std::env::temp_dir().join(format!("mkz_mergedest_{}", std::process::id()));
+        let src = base.join("src");
+        let dst = base.join("out");
+        let _ = std::fs::remove_dir_all(&base);
+        std::fs::create_dir_all(&src).unwrap();
+        std::fs::write(src.join("a.log"), b"new content\n").unwrap();
+
+        let archive = base.join("a.mkz");
+        create(archive.to_str().unwrap(), &[src.to_str().unwrap().to_string()], 1 << 16, 12, false).unwrap();
+
+        // Pre-populate dest before extracting: an unrelated file that must survive the
+        // merge untouched, plus a stale file at the exact path the archive will
+        // re-extract to, which must be overwritten by the archive's content.
+        let root = dst.join(safe_rel(&src));
+        std::fs::create_dir_all(&root).unwrap();
+        std::fs::write(dst.join("unrelated.txt"), b"keep me\n").unwrap();
+        std::fs::write(root.join("a.log"), b"stale content\n").unwrap();
+
+        extract(archive.to_str().unwrap(), dst.to_str().unwrap(), false).unwrap();
+
+        assert_eq!(std::fs::read(dst.join("unrelated.txt")).unwrap(), b"keep me\n");
+        assert_eq!(std::fs::read(root.join("a.log")).unwrap(), b"new content\n");
 
         std::fs::remove_dir_all(&base).ok();
     }
