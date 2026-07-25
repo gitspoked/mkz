@@ -464,11 +464,48 @@ fn create(archive: &str, paths: &[String], block: usize, level: i32, verbose: bo
 
 fn extract(archive: &str, dest: &str, verbose: bool) -> Result<()> {
     let mut r = BufReader::new(File::open(archive).with_context(|| format!("open {archive}"))?);
-    std::fs::create_dir_all(dest).with_context(|| format!("mkdir {dest}"))?;
-    let mut sink = ArchiveSink::new(PathBuf::from(dest), verbose);
-    decompress_stream(&mut r, &mut sink)?; // verifies the SHA-256 trailer before returning Ok
-    sink.flush().ok();
-    eprintln!("mkz: extracted {archive} -> {dest} (SHA-256 verified)");
+    let dest_path = PathBuf::from(dest);
+    std::fs::create_dir_all(&dest_path).with_context(|| format!("mkdir {dest}"))?;
+    let staging = dest_path.join(format!(".mkz-partial.{}", std::process::id()));
+    std::fs::create_dir_all(&staging).with_context(|| "mkdir staging")?;
+
+    let mut sink = ArchiveSink::new(staging.clone(), verbose);
+    match decompress_stream(&mut r, &mut sink) {
+        Ok(()) => {
+            sink.flush().ok();
+            merge_move(&staging, &dest_path)?;
+            std::fs::remove_dir(&staging).ok(); // empty after the merge; never removes content
+            eprintln!("mkz: extracted {archive} -> {dest} (SHA-256 verified)");
+            Ok(())
+        }
+        Err(e) => {
+            sink.flush().ok();
+            eprintln!(
+                "mkz: extraction FAILED; nothing was placed in {dest}. Partial data left for inspection at {}",
+                staging.display()
+            );
+            Err(e)
+        }
+    }
+}
+
+/// Move every entry under src into dst: directories are merged (create_dir_all), files
+/// are renamed over (atomic replace on the same filesystem, which staging-under-dest
+/// guarantees). Emptied source dirs are removed with remove_dir (refuses non-empty).
+fn merge_move(src: &Path, dst: &Path) -> Result<()> {
+    for entry in std::fs::read_dir(src).with_context(|| format!("read_dir {}", src.display()))? {
+        let entry = entry?;
+        let from = entry.path();
+        let to = dst.join(entry.file_name());
+        if entry.file_type()?.is_dir() {
+            std::fs::create_dir_all(&to).with_context(|| format!("mkdir {}", to.display()))?;
+            merge_move(&from, &to)?;
+            std::fs::remove_dir(&from).ok();
+        } else {
+            std::fs::rename(&from, &to)
+                .with_context(|| format!("rename {} -> {}", from.display(), to.display()))?;
+        }
+    }
     Ok(())
 }
 
@@ -655,5 +692,36 @@ mod tests {
     #[test]
     fn help_and_version_smoke() {
         assert!(HELP.contains("mkz -czf"));
+    }
+
+    #[test]
+    fn corrupt_trailer_leaves_dest_untouched() {
+        let base = std::env::temp_dir().join(format!("mkz_atomic_{}", std::process::id()));
+        let src = base.join("src");
+        let dst = base.join("out");
+        let _ = std::fs::remove_dir_all(&base);
+        std::fs::create_dir_all(&src).unwrap();
+        std::fs::write(src.join("a.log"), b"alpha\nbeta\n").unwrap();
+        let archive = base.join("a.mkz");
+        create(archive.to_str().unwrap(), &[src.to_str().unwrap().to_string()], 1 << 16, 12, false).unwrap();
+
+        // Corrupt the SHA-256 trailer (last byte) - blocks still decode fine.
+        let mut bytes = std::fs::read(&archive).unwrap();
+        let n = bytes.len();
+        bytes[n - 1] ^= 0xff;
+        std::fs::write(&archive, &bytes).unwrap();
+
+        assert!(extract(archive.to_str().unwrap(), dst.to_str().unwrap(), false).is_err());
+        // Atomicity contract: no partial entries appear in dest itself.
+        let visible: Vec<_> = std::fs::read_dir(&dst)
+            .map(|it| {
+                it.filter_map(|e| e.ok())
+                    .filter(|e| !e.file_name().to_string_lossy().starts_with(".mkz-partial."))
+                    .collect()
+            })
+            .unwrap_or_default();
+        assert!(visible.is_empty(), "partial entries leaked into dest: {visible:?}");
+
+        std::fs::remove_dir_all(&base).ok();
     }
 }
