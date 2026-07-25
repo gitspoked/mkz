@@ -32,6 +32,10 @@ extractor; the DMA-friendly layout property (only firms up if the chip target do
   insurance; costs nothing today since every 0.1.0 block uses only bit 0. **Prerequisite for the
   codec id field, PAS2 index-segment kinds, and recovery markers - ship before all of them.**
 
+- **REGISTRY.md**: the id-space authority (flag bits, codec ids, PAS2 segment kinds,
+  value types) now lives at the repo root; every future allocation updates it in the
+  same commit.
+
 ## 0.2: codec framework (brotli as codec #1)
 
 Proven +12% on target data, but corpus-dependent (a text/log win, like autocol; on binary the
