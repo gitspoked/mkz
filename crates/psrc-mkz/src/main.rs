@@ -199,6 +199,12 @@ fn decompress_stream<R: Read, W: Write>(r: &mut R, w: &mut W) -> Result<()> {
         }
         let mut flags = [0u8; 1];
         r.read_exact(&mut flags)?;
+        if flags[0] & !1 != 0 {
+            bail!(
+                "block uses unknown flag bits 0x{:02x}: archive was made by a newer mkz (or is corrupt); refusing to guess",
+                flags[0]
+            );
+        }
         let orig_len = read_uvarint(r)? as usize;
         let comp_len = read_uvarint(r)? as usize;
         // Bound the allocation by the bytes actually present: a crafted comp_len must not
@@ -214,7 +220,7 @@ fn decompress_stream<R: Read, W: Write>(r: &mut R, w: &mut W) -> Result<()> {
             bail!("truncated block payload: expected {comp_len} bytes, got {got}");
         }
         let backend = zstd::decode_all(&payload[..]).context("zstd decode")?;
-        let block = if flags[0] == 1 {
+        let block = if flags[0] & 1 == 1 {
             autocol::try_decode(&backend)
                 .ok_or_else(|| anyhow::anyhow!("autocol decode failed: corrupt block"))?
         } else {
@@ -628,6 +634,22 @@ mod tests {
         assert!(root.join("empty").is_dir());
 
         std::fs::remove_dir_all(&base).ok();
+    }
+
+    #[test]
+    fn unknown_flag_bits_rejected() {
+        // Layout per FORMAT.md: MAGIC(4) tag(1) flags(1) ... -> block 0 flags at offset 5.
+        let data = b"reject unknown bits\n".repeat(8);
+        let mut comp = Vec::new();
+        compress_stream(&mut Cursor::new(&data[..]), &mut comp, 1 << 20, 12).expect("compress");
+        assert_eq!(comp[4], 1, "first record must be a block");
+        comp[5] |= 0x02; // set a reserved bit; payload untouched
+        let mut out = Vec::new();
+        let err = decompress_stream(&mut Cursor::new(&comp), &mut out).unwrap_err();
+        assert!(
+            err.to_string().contains("unknown flag bits"),
+            "got: {err:#}"
+        );
     }
 
     #[test]
