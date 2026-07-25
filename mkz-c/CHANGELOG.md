@@ -9,8 +9,9 @@ Keep a Changelog.
 - Readers now REJECT blocks with unknown flag bits instead of silently decoding them as
   plain zstd (forward-compat gate for codec ids and PAS2; settlement spec 2026-07-25).
 - Extraction is atomic: entries stream into `<dest>/.mkz-partial.<pid>` and are placed
-  into `<dest>` only after the SHA-256 trailer verifies. Failures leave the staging
-  directory for inspection and place nothing.
+  into `<dest>` only after the SHA-256 trailer verifies. A failure before that point
+  places nothing; a failure during the final move can leave a partial merge. The staging
+  directory is retained and reported either way.
 - `mkz -xf -` (stdin) is refused with a clear message (the reader needs a seekable file).
 
 ### C build

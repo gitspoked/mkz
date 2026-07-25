@@ -53,8 +53,9 @@ mkz -cz19vf big.mkz data/       # zstd level 19, verbose
 
 Extraction is bit-exact and verifies a SHA-256 over the whole stream, reporting corruption
 on a mismatch. Extraction is atomic: entries stage into `<dest>/.mkz-partial.<pid>` and land
-in `<dest>` only after the SHA-256 trailer verifies; a failed extraction places nothing and
-leaves the staging directory for inspection. For the raw transform
+in `<dest>` only after the SHA-256 trailer verifies; a failure before that point places
+nothing, a failure during the final move can leave a partial merge, and the staging
+directory is retained and reported either way. For the raw transform
 with no backend, to pipe into your own coder:
 
 ```sh
@@ -67,8 +68,9 @@ mkz untransform app.log.ac  app.log
 - Bit-exact. Every artifact carries a SHA-256 of the original. `decompress` recomputes
   it over the whole stream and reports corruption on a mismatch, so corruption is caught.
   Extraction is atomic: entries stage into `<dest>/.mkz-partial.<pid>` and land in `<dest>`
-  only after the SHA-256 trailer verifies; a failed extraction places nothing and leaves
-  the staging directory for inspection.
+  only after the SHA-256 trailer verifies; a failure before that point places nothing, a
+  failure during the final move can leave a partial merge, and the staging directory is
+  retained and reported either way.
 - Never worse. Each block ships whichever is smaller of `autocol->zstd` and `zstd`. If
   the transform doesn't help, the block is plain zstd, and output is never larger than
   zstd alone.

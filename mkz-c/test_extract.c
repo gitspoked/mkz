@@ -26,29 +26,39 @@ static int visible_entries(const char *dir) {
     return n;
 }
 
-/* Regression for move_tree's depth handling: a ~200-level single-char directory chain
- * (well under move_tree's MKZ_MOVE_TREE_MAX_DEPTH cap of 256, but deep enough that the
- * old stack-array-per-frame implementation would have burned ~200 * 16 KB =~ 3.2 MB of
- * stack) must extract cleanly via the heap-allocated-per-frame move_tree, with the
- * deep file's content intact. This does not, by itself, prove the stack-exhaustion bug
- * is fixed (3.2 MB comfortably fits an 8 MB default stack even pre-fix) - it proves the
- * heap-based recursion still works correctly at real depth. */
-#define DEEP_LEVELS 200
+/* Regression for move_tree's depth handling. Parameterized over `levels` and run twice
+ * below, at two depths that each prove something different:
+ *
+ * - DEEP_LEVELS_BASELINE (200): well under move_tree's MKZ_MOVE_TREE_MAX_DEPTH cap
+ *   (1024), but deep enough that the old stack-array-per-frame implementation would have
+ *   burned ~200 * 16 KB =~ 3.2 MB of stack. This does not, by itself, prove the
+ *   stack-exhaustion bug is fixed (3.2 MB comfortably fits an 8 MB default stack even
+ *   pre-fix) - it proves the heap-based recursion still works correctly at real depth.
+ *
+ * - DEEP_LEVELS_REGRESSION (300): exceeds the OLD cap of 256. Before the cap was raised
+ *   to 1024, a C-created 300-level archive FAILED C extraction post-SHA-verify (a
+ *   PARTIAL merge, polluting dest) even though the very same archive extracted cleanly
+ *   with the Rust implementation - the cap was tighter than what mkz_safe_join itself
+ *   allows an archive to be created with. 300 stays far under the new 1024 cap and under
+ *   safe_join's own ~1023-level ceiling (rel paths < 2048 bytes, 2 bytes/level minimum),
+ *   so a clean extract here proves the invariant: mkz always extracts what mkz creates. */
+#define DEEP_LEVELS_BASELINE   200
+#define DEEP_LEVELS_REGRESSION 300
 
-static void test_deep_nesting(void) {
+static void test_deep_nesting(int levels) {
     const char *base = "/tmp/mkz_test_deep";
     char ws[128];
-    snprintf(ws, sizeof ws, "%s.%ld", base, (long)getpid());
+    snprintf(ws, sizeof ws, "%s.%ld.%d", base, (long)getpid(), levels);
 
     char srctop[160];
     snprintf(srctop, sizeof srctop, "%s/src", ws);
     assert(mkz_mkdir_p(srctop) == 0);
 
-    /* extend an absolute path by "/d" DEEP_LEVELS times, mkdir_p-ing as we go */
+    /* extend an absolute path by "/d" `levels` times, mkdir_p-ing as we go */
     char deep[1024];
     size_t n = (size_t)snprintf(deep, sizeof deep, "%s", srctop);
     assert(n < sizeof deep);
-    for (int i = 0; i < DEEP_LEVELS; i++) {
+    for (int i = 0; i < levels; i++) {
         assert(n + 2 < sizeof deep);
         deep[n++] = '/'; deep[n++] = 'd'; deep[n] = '\0';
         assert(mkz_mkdir_p(deep) == 0);
@@ -78,7 +88,7 @@ static void test_deep_nesting(void) {
     fclose(ef);
     assert(got == 5 && memcmp(buf, "deep\n", 5) == 0);
 
-    fprintf(stderr, "ok: %d-level nested extract landed with correct content\n", DEEP_LEVELS);
+    fprintf(stderr, "ok: %d-level nested extract landed with correct content\n", levels);
 }
 
 /* Regression for the 0.1.3 scratch-reuse fix (mkz_pas1_decode_block_into / struct
@@ -241,7 +251,8 @@ int main(void) {
     assert(visible_entries(dest) == 0);   /* atomicity: nothing placed in dest */
     fprintf(stderr, "ok: corrupt trailer left dest untouched\n");
 
-    test_deep_nesting();
+    test_deep_nesting(DEEP_LEVELS_BASELINE);
+    test_deep_nesting(DEEP_LEVELS_REGRESSION);
     test_scratch_reuse_mixed_blocks();
     return 0;
 }

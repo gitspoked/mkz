@@ -106,7 +106,7 @@ int main(int argc, char **argv) {
             return 2;
         }
         rc = mkz_extract_stream(archive, dest, verbose);
-        if (rc) fprintf(stderr, "mkz: %s could not be extracted (not a valid PAS1 archive, or it uses features newer than this mkz)\n", archive);
+        if (rc) fprintf(stderr, "mkz: %s could not be extracted (invalid archive, features newer than this mkz, or a placement failure - see messages above)\n", archive);
         else    fprintf(stderr, "mkz: extracted %s -> %s (SHA-256 verified)\n", archive, dest);
     }
     free(pos);

@@ -1,6 +1,6 @@
 .\" mkz.1: manual page for the pure-C mkz.
 .\" SPDX-License-Identifier: MIT OR Apache-2.0
-.Dd June 29, 2026
+.Dd July 25, 2026
 .Dt MKZ 1
 .Os
 .Sh NAME
@@ -51,9 +51,10 @@ directory inside
 and are placed into
 .Ar destdir
 only after the SHA-256 trailer verifies.
-A failed extraction places nothing in
+A failure before that point places nothing in
 .Ar destdir ;
-the staging directory is left in place for inspection.
+a failure during the final move can leave a partial merge.
+The staging directory is retained and reported in either case.
 .Pp
 Both creation and extraction stream line-oriented input in bounded memory for
 typical text and logs: peak memory is roughly one block.

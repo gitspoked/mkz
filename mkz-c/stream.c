@@ -361,8 +361,16 @@ static int sink_feed(struct sink *s, const uint8_t *data, size_t n) {
  * untrusted archive (mkz_safe_join permits stored rel paths up to ~2000 bytes, i.e. up to
  * ~1000 levels of single-char directory nesting). Cap the depth so a hostile archive can't
  * exhaust the stack; deeper than this is treated as a move_tree failure (routes to the
- * existing PARTIAL-merge message, same as any other placement failure). */
-#define MKZ_MOVE_TREE_MAX_DEPTH 256
+ * existing PARTIAL-merge message, same as any other placement failure).
+ *
+ * 1024, not 256: mkz_safe_join admits rel paths < 2048 bytes, so the deepest real nesting
+ * is ~1023 levels (2 bytes minimum per level, "/x"). A 1024 cap is therefore unreachable
+ * for any archive that passed path validation to begin with, restoring the invariant that
+ * mkz always extracts what mkz creates, while still bounding recursion: the from/to path
+ * buffers are heap-allocated per frame (not stack arrays), so each frame costs ~250 B of
+ * stack, ~256 KB worst case at the new cap - not the multi-MB it would be with stack
+ * arrays. */
+#define MKZ_MOVE_TREE_MAX_DEPTH 1024
 
 /* Move every entry under src into dst: directories are merged (mkz_mkdir_p + recurse),
  * files are renamed over (atomic replace; staging lives under dest, same filesystem).

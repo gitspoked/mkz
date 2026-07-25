@@ -22,15 +22,17 @@ Orthogonal riders (fold in where convenient, not gating): the "read the old worl
 extractor; the DMA-friendly layout property (only firms up if the chip target does).
 
 ## 0.1.x (fast-follow, no format change)
-- **Atomic extraction**: write files to a temp path and `rename()` into place only after the
-  SHA-256 trailer verifies, so a corrupt archive leaves nothing half-written. (0.1.0 verifies the
-  SHA *last*, after files are on disk; the README/CHANGELOG wording was corrected to say so.)
+- **[shipped in 0.1.3] Atomic extraction**: write files to a temp path and `rename()` into place
+  only after the SHA-256 trailer verifies, so a corrupt archive leaves nothing half-written.
+  (0.1.0 verifies the SHA *last*, after files are on disk; the README/CHANGELOG wording was
+  corrected to say so.)
 
-- **Reject unknown block-flag bits loudly**: the per-block `flags` byte uses only bit 0 (autocol).
-  Make the decoder error on any bit it doesn't understand, so a future codec (see brotli below)
-  fails clean on an old reader instead of feeding foreign bytes to zstd. Cheap forward-compat
-  insurance; costs nothing today since every 0.1.0 block uses only bit 0. **Prerequisite for the
-  codec id field, PAS2 index-segment kinds, and recovery markers - ship before all of them.**
+- **[shipped in 0.1.3] Reject unknown block-flag bits loudly**: the per-block `flags` byte uses
+  only bit 0 (autocol). Make the decoder error on any bit it doesn't understand, so a future
+  codec (see brotli below) fails clean on an old reader instead of feeding foreign bytes to
+  zstd. Cheap forward-compat insurance; costs nothing today since every 0.1.0 block uses only
+  bit 0. **Prerequisite for the codec id field, PAS2 index-segment kinds, and recovery markers -
+  ship before all of them.**
 
 - **REGISTRY.md**: the id-space authority (flag bits, codec ids, PAS2 segment kinds,
   value types) now lives at the repo root; every future allocation updates it in the

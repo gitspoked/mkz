@@ -22,7 +22,8 @@ mkz -xf  logs.mkz out/         # extract
 - Bit-exact and integrity-gated: every archive carries an SHA-256; extraction verifies it
   over the whole stream and reports corruption on a mismatch. Extraction is atomic: entries
   stage into `<dest>/.mkz-partial.<pid>` and land in `<dest>` only after the SHA-256 trailer
-  verifies; a failed extraction places nothing and leaves the staging dir for inspection.
+  verifies; a failure before that places nothing, a failure during the final move can leave a
+  partial merge, and the staging dir is always retained and reported.
 - Audited decoder: untrusted bytes are fully bounds- and overflow-checked, path traversal
   is guarded, and it is ASan/UBSan-clean on valid and hostile input.
 - One hard dependency (libzstd); SHA-256 and base-95 are vendored. MIT OR Apache-2.0,
