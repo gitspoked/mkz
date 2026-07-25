@@ -7,7 +7,8 @@ Keep a Changelog.
 
 ### mkz (both implementations)
 - Readers now REJECT blocks with unknown flag bits instead of silently decoding them as
-  plain zstd (forward-compat gate for codec ids and PAS2; settlement spec 2026-07-25).
+  plain zstd. This is the forward-compat gate for the planned codec ids and PAS2 segment
+  work (see REGISTRY.md and ROADMAP.md).
 - Extraction is atomic: entries stream into `<dest>/.mkz-partial.<pid>` and are placed
   into `<dest>` only after the SHA-256 trailer verifies. A failure before that point
   places nothing; a failure during the final move can leave a partial merge. The staging

@@ -23,16 +23,16 @@ The single authority for every enumerated id in the mkz format family. Rules:
 |----|-------|--------|-------------------------------|
 | 0 | zstd | allocated (implied today by absence of the field) | libzstd; level recorded per archive |
 | 1 | brotli | reserved for 0.2 | C libbrotli via FFI both impls; pin quality/lgwin/mode at allocation |
-| 2 | stored (identity, no compression) | reserved for 0.2 | none; measured necessary for high-entropy payloads (settlement 2.3) |
+| 2 | stored (identity, no compression) | reserved for 0.2 | none; high-entropy payloads measure incompressible, so skip the codec work like zip's STORE |
 | 3 | lz4 | reserved; implement only if the no-MMU chip target demands a trivial RTL decoder | liblz4 if ever implemented |
 | 4-15 | future general codecs | reserved | |
 | 16-31 | per-column specialized codecs (0.4: delta, RLE/dict, frame-of-reference, b95pack) | reserved | |
 | 240-255 | private/experimental; never in interchange archives | reserved | |
 
-xz/lzma and lzop are explicitly NOT allocated (settlement 2.3: measured no-win, and
-supply-chain caution on liblzma).
+xz/lzma and lzop are explicitly NOT allocated: measured no meaningful win over zstd at
+much higher decode cost, and liblzma warrants supply-chain caution on a decode surface.
 
-## PAS2 index-segment kinds (ships in 0.3; criticality per settlement 2.4)
+## PAS2 index-segment kinds (ships in 0.3)
 
 Criticality: a reader hitting an UNKNOWN critical kind MUST reject loudly; an unknown
 ancillary kind MUST be skipped with a single warning.

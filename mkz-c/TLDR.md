@@ -20,14 +20,14 @@ mkz -xf  logs.mkz out/         # extract
   that used to make extract memory grow with total archive size instead of staying flat).
   Newline-free input is the exception: it is buffered whole and not yet bounded.
 - Bit-exact and integrity-gated: every archive carries an SHA-256; extraction verifies it
-  over the whole stream and reports corruption on a mismatch. Extraction is atomic: entries
-  stage into `<dest>/.mkz-partial.<pid>` and land in `<dest>` only after the SHA-256 trailer
-  verifies; a failure before that places nothing, a failure during the final move can leave a
-  partial merge, and the staging dir is always retained and reported.
+  over the whole stream and reports corruption on a mismatch. Extracts are staged in
+  `<dest>/.mkz-partial.<pid>` and placed only after the archive verifies, so a bad archive
+  leaves your files alone (see README for the fine print).
 - Audited decoder: untrusted bytes are fully bounds- and overflow-checked, path traversal
   is guarded, and it is ASan/UBSan-clean on valid and hostile input.
-- One hard dependency (libzstd); SHA-256 and base-95 are vendored. MIT OR Apache-2.0,
-- Say it with me now, thank you James! If you know one.
+- One hard dependency (libzstd); SHA-256 and base-95 are vendored. MIT OR Apache-2.0.
+
+mkz got here because of James. If you know one, thank him.
 
 (c) Matthew Klein
 
