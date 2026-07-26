@@ -78,6 +78,13 @@ single whole-archive SHA-256 is all-or-nothing. Cash in the block structure, bzi
   poisons its neighbors. (Also why the ~3% cross-block dictionary was not worth taking.)
 - **`mkzfix`**: a separate utility (like `bzip2recover`) that harvests every block that verifies,
   rebuilds the directory, re-seals a fresh valid mkz, and loudly reports the holes.
+- **Generation-aware re-sealing.** Because data blocks and the content trailer are identical
+  across container generations, the same re-seal path that recovery uses can also convert:
+  demote a newer archive to plain PAS1 for old readers (drop the additive segments; transcode
+  any non-zstd blocks down to zstd), or promote a PAS1 by computing the segments. The content
+  SHA-256 is preserved verbatim either way, so a converted archive provably carries the same
+  data. Recovery and conversion are one verb with different inputs; both default their output
+  to the oldest generation every mkz can read.
 - Overhead is ~0.01% at the default 16 MiB block; keep markers/checksums behind an optional flag
   so pure-archival mode pays nothing.
 
