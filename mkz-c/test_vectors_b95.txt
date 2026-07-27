@@ -1,0 +1,38 @@
+# b95 ABI test vectors - the frozen key encoding shared by mkz and Qubed.
+# Canonical home: mkz-c/test_vectors_b95.txt. Copies elsewhere must stay byte-identical.
+#
+# Format: <kind> <decimal value> <hex of encoded bytes>
+#   u64 -> exactly 10 bytes (base95.c / Qubed base95.rs)
+#   u16 -> exactly 3 bytes  (b95u16.c / Qubed b95u16.rs)
+# Contract: base 95, offset 0x20 (space = digit 0), big-endian digits, left-padded
+# with spaces, memcmp order == numeric order. An implementation conforms iff it
+# encodes each value to exactly these bytes AND decodes these bytes back to the value.
+#
+# zero and one (the classic anchors)
+u64 0 20202020202020202020
+u64 1 20202020202020202021
+u64 42 2020202020202020204a
+# digit boundaries: 94 = last single digit, 95 = first two-digit value
+u64 94 2020202020202020207e
+u64 95 20202020202020202120
+u64 96 20202020202020202121
+u64 9024 20202020202020207e7e
+u64 1000000 202020202020212f6c3e
+u64 4294967295 20202020205465495e25
+# i64::MAX, u64::MAX - 1, u64::MAX (order matters: last two differ in one byte)
+u64 9223372036854775807 2e5c3a306d7e41717731
+u64 18446744073709551614 3d3954415c7d63646f42
+u64 18446744073709551615 3d3954415c7d63646f43
+# u16: same boundaries at width 3
+u16 0 202020
+u16 1 202021
+u16 94 20207e
+u16 95 202120
+u16 9024 207e7e
+u16 9025 212020
+# 0x4E2D (a CJK code unit), then lone surrogates 0xD800 / 0xDFFF - raw code
+# units must survive; b95u16 never treats input as a "string"
+u16 20013 22345f
+u16 55296 262c26
+u16 57343 26415a
+u16 65535 273870

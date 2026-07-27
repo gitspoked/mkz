@@ -19,8 +19,8 @@ INSTALL ?= install
 DISTNAME := mkz-$(V)
 DIST_SRC  := base95.c base95.h b95u16.c b95u16.h sha256.c sha256.h pas1.c pas1.h \
              autocol.c autocol.h archive.c archive.h stream.c stream.h mkz.c
-DIST_TEST := test_base95.c test_b95u16.c test_pas1.c test_autocol.c test_acenc.c \
-             test_extract.c
+DIST_TEST := test_base95.c test_b95u16.c test_b95_vectors.c test_vectors_b95.txt \
+             test_pas1.c test_autocol.c test_acenc.c test_extract.c
 DIST_DOC  := Makefile README.md TLDR.md INSTALL install.sh \
              CHANGELOG.md SECURITY.md NOTICE COPYING mkz.1
 DIST_LIC  := LICENSE-MIT LICENSE-APACHE
@@ -34,6 +34,10 @@ test_base95: base95.c test_base95.c base95.h
 
 test_b95u16: b95u16.c test_b95u16.c b95u16.h
 	$(CC) $(CFLAGS) -o $@ b95u16.c test_b95u16.c
+
+# --- ABI pin: both codecs against the shared vector file (Qubed pins to a copy) ---
+test_b95_vectors: base95.c b95u16.c test_b95_vectors.c base95.h b95u16.h
+	$(CC) $(CFLAGS) -o $@ base95.c b95u16.c test_b95_vectors.c
 
 # --- container: PAS1 framing + libzstd + vendored SHA-256 (+ autocol for flags&1 blocks) ---
 test_pas1: pas1.c sha256.c autocol.c test_pas1.c pas1.h sha256.h autocol.h
@@ -61,9 +65,10 @@ mkz.asan: mkz.c stream.c pas1.c sha256.c autocol.c archive.c stream.h pas1.h sha
 	$(CC) $(CPPFLAGS) $(CFLAGS) -fsanitize=address,undefined -o $@ mkz.c stream.c pas1.c sha256.c autocol.c archive.c $(LDFLAGS) $(ZSTD)
 
 .PHONY: all check install uninstall dist clean
-check: test_base95 test_b95u16 test_pas1 test_extract
+check: test_base95 test_b95u16 test_b95_vectors test_pas1 test_extract
 	./test_base95
 	./test_b95u16
+	./test_b95_vectors
 	./test_pas1
 	./test_extract
 
@@ -88,5 +93,5 @@ dist:
 	@echo "SIZE: `wc -c < $(DISTNAME).tar.gz` bytes"
 
 clean:
-	rm -f test_base95 test_b95u16 test_pas1 test_extract test_autocol test_acenc mkz mkz.asan *.o
+	rm -f test_base95 test_b95u16 test_b95_vectors test_pas1 test_extract test_autocol test_acenc mkz mkz.asan *.o
 	rm -rf $(DISTNAME) $(DISTNAME).tar.gz
