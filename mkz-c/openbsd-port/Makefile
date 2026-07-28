@@ -1,6 +1,6 @@
 COMMENT =	reversible columnar pre-pass + zstd archiver
 
-V =		0.1.3
+V =		0.1.4
 DISTNAME =	mkz-${V}
 CATEGORIES =	archivers
 

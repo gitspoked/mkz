@@ -17,7 +17,7 @@ The single authority for every enumerated id in the mkz format family. Rules:
 | 0 | payload decompresses to an autocol blob | allocated (0.1.0) |
 | 1-7 | reserved; writers MUST emit 0; readers MUST reject (since 0.1.3) | reserved |
 
-## Codec ids (planned block-header field, ships in 0.2)
+## Codec ids (planned mkz block-header field, ships in 0.2)
 
 | id | codec | status | normative library / parameters |
 |----|-------|--------|-------------------------------|
@@ -32,7 +32,30 @@ The single authority for every enumerated id in the mkz format family. Rules:
 xz/lzma and lzop are explicitly NOT allocated: measured no meaningful win over zstd at
 much higher decode cost, and liblzma warrants supply-chain caution on a decode surface.
 
-## PAS2 index-segment kinds (ships in 0.3)
+## autocol blob versions
+
+| version | meaning | status |
+|---------|---------|--------|
+| 1 | current tokenizer/skeleton columnar blob with raw, delta, and dict-ref columns | allocated (0.1.0) |
+| 2 | field-aware lanes, including JSONL/keyed columns and specialized numeric lanes | reserved for 0.2 |
+| 3-239 | unallocated | |
+| 240-255 | private/experimental; never in interchange archives | reserved |
+
+## autocol v2 lane ids
+
+| id | lane | status |
+|----|------|--------|
+| 0 | raw values | reserved for 0.2 |
+| 1 | delta integers | reserved for 0.2 |
+| 2 | dictionary / enum | reserved for 0.2 |
+| 3 | constant value | reserved for 0.2 |
+| 4 | segmented-linear integer runs | reserved for 0.2 |
+| 5 | frame-of-reference bounded integers | reserved |
+| 6 | b95pack / b95u16 packed keys or code units | reserved |
+| 7-31 | future per-lane transforms | reserved |
+| 240-255 | private/experimental; never in interchange blobs | reserved |
+
+## PAS2 index-segment kinds (later seekable/keyed work)
 
 Criticality: a reader hitting an UNKNOWN critical kind MUST reject loudly; an unknown
 ancillary kind MUST be skipped with a single warning.
@@ -46,7 +69,7 @@ ancillary kind MUST be skipped with a single warning.
 | 5 | signature/provenance | ancillary | reserved |
 | 6+ | unallocated | | |
 
-## Value type enum (PAS2 schema, ships in 0.3)
+## Value type enum (later seekable/keyed schema)
 
 | code | type | status |
 |------|------|--------|

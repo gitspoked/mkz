@@ -138,3 +138,6 @@ groups decoding above 0xFFFF.
 - Readers reject unknown flag bits since 0.1.3; this is the forward-compat gate that
   future format work (codec ids, PAS2 segment kinds) relies on. Planned allocations live
   in REGISTRY.md and ROADMAP.md.
+- 0.1.4 may reserve ids, add vectors, and stage v2 release files, but default writers still
+  emit PAS1 + autocol v1 + zstd. autocol version 2 and mkz block codec ids first become
+  eligible for emitted interchange bytes in 0.2.0.

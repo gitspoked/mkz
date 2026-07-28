@@ -2,26 +2,26 @@
 
 Post-0.1.0 ideas - 0.1.0 ships the clean zstd archiver.
 
-## Sequencing (dependency order)
+## Sequencing (release order)
 
-The post-0.1 work is a dependency chain, not a flat list. Ship in this order:
+Keep the train short. The 0.1 line is prep and compatibility; 0.2 is the first real
+wire-format expansion.
 
-1. **0.1.x - reject unknown flag bits (the unblocker).** Prerequisite for everything after:
-   codec ids, new index-segment kinds, and recovery markers all need old readers to fail
-   clean on bits they do not understand. Cheap; do it first.
-2. **0.2 - codec framework + resilience.** Brotli done AS the codec registry (not a one-off),
-   plus per-block recovery framing + the `mkzfix` tool. Minimal format touch, guarded by (1).
-3. **0.3 - PAS2 seekable segment (the big format).** Container, footer, typed index segments,
-   sorted-key directory, schema header, `libmkz`; Family A (paths) then Family B (records).
-   Honors the DMA-friendly layout property (chip target). Full design in
-   `docs/superpowers/specs/2026-07-09-mkz-seekable-segment-design.md`.
-4. **0.4+ - per-column codecs (ratio on the columnar substrate).** Rides on 0.3's schema and
-   0.2's codec registry. This is where dictionary work, if any, belongs.
+1. **0.1.3 - safety release.** Ship the forward-compat reader behavior and extraction
+   hardening that make future archives fail cleanly on old readers.
+2. **0.1.4 - v2 prep release.** No default wire change. Freeze the ids, golden vectors,
+   test harnesses, docs, and release-directory split needed to pull autocol v2 and mkz v2
+   down cleanly.
+3. **0.2.0 - v2 wire release.** Autocol `FORMAT_VERSION = 2` plus mkz block codec ids.
+   Brotli/stored block codecs and the first field-aware JSONL/autocol v2 lanes land here
+   behind the existing never-worse gate.
+4. **0.2.x - cleanup / recovery riders.** Per-block recovery markers, `mkzfix`, tar/gz/zst
+   extraction, and any polish that does not need a new major format idea.
 
 Orthogonal riders (fold in where convenient, not gating): the "read the old world" tar
 extractor; the DMA-friendly layout property (only firms up if the chip target does).
 
-## 0.1.x (fast-follow, no format change)
+## 0.1.3 (safety release, no format change)
 - **[shipped in 0.1.3] Atomic extraction**: write files to a temp path and `rename()` into place
   only after the SHA-256 trailer verifies, so a corrupt archive leaves nothing half-written.
   (0.1.0 verifies the SHA *last*, after files are on disk; the README/CHANGELOG wording was
@@ -38,7 +38,27 @@ extractor; the DMA-friendly layout property (only firms up if the chip target do
   value types) now lives at the repo root; every future allocation updates it in the
   same commit.
 
-## 0.2: codec framework (brotli as codec #1)
+## 0.1.4 (v2 prep release, no default wire change)
+
+This release exists so 0.2 is a product release, not a planning bundle.
+
+- Freeze `REGISTRY.md` allocations for mkz block codec ids and autocol v2 lane ids.
+- Add golden vectors for current autocol v1/PAS1 and the base95/b95u16 ABI so v2 work cannot
+  accidentally move the old floor.
+- Add non-shipping probes/benchmarks for JSONL field-aware lanes, segmented-linear numeric
+  lanes, and Brotli/stored candidates.
+- Maintain writer defaults as PAS1 + autocol v1 + zstd. Old readers must still read default
+  archives from 0.1.4.
+- Create and maintain a separate v2 release staging directory seeded only with the pertinent
+  public files.
+
+## 0.2.0: v2 wire release
+
+0.2.0 is the first release allowed to emit bytes old 0.1 readers cannot decode by default.
+Because 0.1.3 readers reject unknown flag bits and 0.1.4 freezes the id registry/vectors,
+old tools should fail loudly instead of guessing.
+
+### mkz block codec framework (brotli as codec #1)
 
 Proven +12% on target data, but corpus-dependent (a text/log win, like autocol; on binary the
 gate falls back). Do it as the codec REGISTRY, so per-column codecs (0.4) and any future codec
@@ -66,7 +86,15 @@ are registry entries, not format changes.
   in the other. (Today both are zstd-only, so interop holds.) Requires the 0.1.x reject-unknown
   work first, so a zstd-only reader refuses a brotli block instead of feeding it to zstd.
 
-## 0.2: resilience and recovery (mkzfix)
+### autocol v2 / field-aware lanes
+
+- Bump autocol's blob version when a new on-wire lane is emitted. v1 readers reject v2 blobs.
+- Keep the existing v1 tokenizer path as the compatibility model.
+- Add field-aware JSONL lanes where records share stable keys, then specialize value lanes:
+  constant, enum, delta, segmented-linear, and raw fallback.
+- Keep lane choice never-worse by measuring candidate lane size and then the backend result.
+
+## 0.2.x: resilience and recovery (mkzfix)
 
 Block-structured formats can survive damage that kills a continuous gzip stream, but today mkz's
 single whole-archive SHA-256 is all-or-nothing. Cash in the block structure, bzip2recover-style:
@@ -88,7 +116,7 @@ single whole-archive SHA-256 is all-or-nothing. Cash in the block structure, bzi
 - Overhead is ~0.01% at the default 16 MiB block; keep markers/checksums behind an optional flag
   so pure-archival mode pays nothing.
 
-## 0.2 (rider): read the old world (interop, decode-side only, NO format change)
+## 0.2.x rider: read the old world (interop, decode-side only, no format change)
 - **Extract `.tar`, `.tar.gz`, `.tar.zst`**: teach `mkz -xf` to detect and unpack standard
   tarballs. Purely additive, never touches the mkz format. This is the zstd playbook: write your
   better format, read everyone else's. Gives adopters "it just works" experience.
@@ -97,7 +125,7 @@ single whole-archive SHA-256 is all-or-nothing. Cash in the block structure, bzi
   columnar transform behind the never-worse gate) needs PAS1's per-block framing, which tar+gzip
   can't express. mkz is to tar.gz what zstd is to gzip: better, and deliberately its own format.
 
-## 0.3: PAS2 seekable/keyed segment (the big format)
+## Later: seekable/keyed segment
 
 Turn a sealed archive into a seekable, keyed, self-describing SSTable-shaped segment (query by
 key without unpacking). Full design + phasing + open questions:
@@ -115,7 +143,7 @@ key without unpacking). Full design + phasing + open questions:
   accelerators DMA rather than mmap. Honor if/when the chip target firms up.
 - Ratio cost of all this structure: ~0.01% at the default block. The payload ratio is unchanged.
 
-## 0.4+: per-column codecs (ratio on the columnar substrate)
+## Later: per-column codecs beyond autocol v2
 
 Rides on 0.3's schema/columns and 0.2's codec registry. Once a column is homogeneous, a
 specialized codec (delta for monotonic timestamps/ids, RLE/dictionary for low cardinality,

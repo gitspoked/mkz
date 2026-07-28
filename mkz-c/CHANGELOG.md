@@ -3,6 +3,18 @@
 Notable changes to mkz and autocol. Versions are SemVer; format loosely follows
 Keep a Changelog.
 
+## [0.1.4] - 2026-07-28
+
+### release prep
+- Prepares the 0.2 v2 wire release without changing the default archive bytes:
+  writers still emit PAS1 + autocol v1 + zstd unless an explicit future v2 mode is selected.
+- Reserves autocol blob version 2 and the initial v2 lane ids in REGISTRY.md, including
+  raw, delta, dictionary/enum, constant, segmented-linear, frame-of-reference, and b95pack.
+- Adds a separate v2 release staging directory so the 0.1 release line and the upcoming 0.2
+  work do not share packaging state by accident.
+- Locks the release rule: 0.1.x may add safety, docs, vectors, and benchmarks; 0.2.0 is the
+  first version allowed to emit default bytes that old 0.1 readers cannot decode.
+
 ## [0.1.3] - 2026-07-28
 
 ### mkz (both implementations)
