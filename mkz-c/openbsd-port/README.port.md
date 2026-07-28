@@ -45,6 +45,10 @@ portcheck                       # from devel/portcheck
 - **Distfile:** `mkz-${V}.tar.gz` roots at `${DISTNAME}/` (the standard layout),
   so no `WRKDIST` override is needed. Regenerate `distinfo` with `make makesum`
   against the published tarball; do not hand-write it.
+- **Release order:** push/tag `v0.1.3` from the current release checkout first, with
+  `V = 0.1.3`. For `v0.1.4`, bump `V` to `0.1.4` in this Makefile and regenerate
+  `distinfo` against the hosted `mkz-0.1.4.tar.gz`. The v2 working tree starts from
+  the `v0.1.4` state.
 - **Dependencies:** `archivers/zstd` only (`WANTLIB = c zstd`). SHA-256 and
   base-95 are vendored, so there is no LibreSSL/crypto dependency.
 - **Restrictive tar modes:** `FIX_EXTRACT_PERMISSIONS = Yes` handles the

@@ -3,7 +3,7 @@
 Notable changes to mkz and autocol. Versions are SemVer; format loosely follows
 Keep a Changelog.
 
-## [0.1.3] - unreleased
+## [0.1.3] - 2026-07-28
 
 ### mkz (both implementations)
 - Readers now REJECT blocks with unknown flag bits instead of silently decoding them as
