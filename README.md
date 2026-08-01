@@ -31,6 +31,14 @@ The `psrc-` prefix marks the crates' origin in the PSRC compression research pro
    plain zstd on the same block; otherwise the block falls back to plain zstd.
 3. **Integrity**: archives carry an end-to-end SHA-256, verified on extract.
 
+## Design docs
+
+- [`FORMAT.md`](FORMAT.md): current byte-level format specification.
+- [`REGISTRY.md`](REGISTRY.md): allocated and reserved format ids.
+- [`ROADMAP.md`](ROADMAP.md): release sequencing.
+- [`docs/rfcs`](docs/rfcs): proposed contracts before implementation.
+- [`docs/design`](docs/design): public design notes and v2 direction.
+
 ## Install
 
 ```sh

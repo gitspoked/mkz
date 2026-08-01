@@ -9,7 +9,7 @@ CFLAGS  ?= -O2 -Wall -Wextra -Wpedantic -std=c11
 # zstd is the only hard external dep (SHA-256 is vendored in sha256.c).
 ZSTD := $(shell pkg-config --cflags --libs libzstd 2>/dev/null || echo -lzstd)
 
-V       ?= 0.1.4
+V       ?= 0.1.5
 PREFIX  ?= /usr/local
 BINDIR  ?= $(PREFIX)/bin
 MANDIR  ?= $(PREFIX)/man/man1

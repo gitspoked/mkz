@@ -9,13 +9,15 @@ wire-format expansion.
 
 1. **0.1.3 - safety release.** Ship the forward-compat reader behavior and extraction
    hardening that make future archives fail cleanly on old readers.
-2. **0.1.4 - v2 prep release.** No default wire change. Freeze the ids, golden vectors,
-   test harnesses, docs, and release-directory split needed to pull autocol v2 and mkz v2
-   down cleanly.
-3. **0.2.0 - v2 wire release.** Autocol `FORMAT_VERSION = 2` plus mkz block codec ids.
+2. **0.1.4 - v2 bridge release.** No default wire change. Freeze the first public
+   registry and version bridge.
+3. **0.1.5 - cleanup and proof release.** No default wire change. Add the public
+   design/RFC set, OpenBSD deep-extract fix, OpenBSD package proof, and the final
+   v2 starting point.
+4. **0.2.0 - v2 wire release.** Autocol `FORMAT_VERSION = 2` plus mkz block codec ids.
    Brotli/stored block codecs and the first field-aware JSONL/autocol v2 lanes land here
    behind the existing never-worse gate.
-4. **0.2.x - cleanup / recovery riders.** Per-block recovery markers, `mkzfix`, tar/gz/zst
+5. **0.2.x - cleanup / recovery riders.** Per-block recovery markers, `mkzfix`, tar/gz/zst
    extraction, and any polish that does not need a new major format idea.
 
 Orthogonal riders (fold in where convenient, not gating): the "read the old world" tar
@@ -38,24 +40,31 @@ extractor; the DMA-friendly layout property (only firms up if the chip target do
   value types) now lives at the repo root; every future allocation updates it in the
   same commit.
 
-## 0.1.4 (v2 prep release, no default wire change)
+## 0.1.4 (v2 bridge release, no default wire change)
 
-This release exists so 0.2 is a product release, not a planning bundle.
+This release puts the public crates and repository on the 0.1.4 bridge without
+changing default archive bytes.
 
 - Freeze `REGISTRY.md` allocations for mkz block codec ids and autocol v2 lane ids.
-- Add golden vectors for current autocol v1/PAS1 and the base95/b95u16 ABI so v2 work cannot
-  accidentally move the old floor.
-- Add non-shipping probes/benchmarks for JSONL field-aware lanes, segmented-linear numeric
-  lanes, and Brotli/stored candidates.
 - Maintain writer defaults as PAS1 + autocol v1 + zstd. Old readers must still read default
   archives from 0.1.4.
-- Create and maintain a separate v2 release staging directory seeded only with the pertinent
-  public files.
+
+## 0.1.5 (cleanup and proof release, no default wire change)
+
+This release closes the public prep work before v2 implementation starts.
+
+- Add public design notes and RFCs for the reconstruction fabric, PAS2 seekable segments,
+  autocol v2 field-aware lanes, and the Hilbert/UTF-16 ceremony boundary.
+- Add the C/OpenBSD deep-extract placement fix and existing-destination merge regression.
+- Rebuild and prove the OpenBSD 7.9/arm64 package.
+- Keep writer defaults as PAS1 + autocol v1 + zstd. Old readers must still read default
+  archives from 0.1.5.
+- Treat `v0.1.5` as the base for the v2 working tree.
 
 ## 0.2.0: v2 wire release
 
 0.2.0 is the first release allowed to emit bytes old 0.1 readers cannot decode by default.
-Because 0.1.3 readers reject unknown flag bits and 0.1.4 freezes the id registry/vectors,
+Because 0.1.3 readers reject unknown flag bits and the 0.1.5 line freezes the prep surface,
 old tools should fail loudly instead of guessing.
 
 ### mkz block codec framework (brotli as codec #1)

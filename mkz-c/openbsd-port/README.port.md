@@ -45,16 +45,20 @@ portcheck                       # from devel/portcheck
 - **Distfile:** `mkz-${V}.tar.gz` roots at `${DISTNAME}/` (the standard layout),
   so no `WRKDIST` override is needed. Regenerate `distinfo` with `make makesum`
   against the published tarball; do not hand-write it.
-- **Release order:** `v0.1.3` refreshed the port against the safety release. `v0.1.4`
-  carries the v2 registry/roadmap prep with `V = 0.1.4` and distinfo for
-  `mkz-0.1.4.tar.gz`. The v2 working tree starts from the `v0.1.4` state.
+- **Release order:** `v0.1.3` refreshed the port against the safety release.
+  `v0.1.4` carries the registry bridge. `v0.1.5` carries the OpenBSD deep-extract
+  placement fix, uses `V = 0.1.5`, and points distinfo at `mkz-0.1.5.tar.gz`.
+  The v2 working tree starts from the `v0.1.5` state.
 - **Dependencies:** `archivers/zstd` only (`WANTLIB = c zstd`). SHA-256 and
   base-95 are vendored, so there is no LibreSSL/crypto dependency.
 - **Restrictive tar modes:** `FIX_EXTRACT_PERMISSIONS = Yes` handles the
   distfile's file modes.
 - **Tests:** `TEST_TARGET = check` wires `make test` to the upstream unit tests
-  (base-95, b95u16, PAS1 container roundtrip, and the paranoid decoder rejects).
+  (base-95, b95u16, PAS1 container roundtrip, paranoid decoder rejects,
+  deep extraction placement, existing-destination merge, and mixed raw/autocol
+  block extraction).
 - **Man page:** `mkz.1` installs to `man/man1`.
 
-Validated on OpenBSD 7.9/arm64: `make build`, `fake`, `test`, `package`, and
-`port-lib-depends-check` all pass, and the installed binary round-trips.
+Validated on OpenBSD 7.9/arm64 for `0.1.5`: `make checksum`, `build`, `fake`,
+`test`, `package`, `port-lib-depends-check`, and `lib-depends-check` all pass.
+The packaged build round-trips byte-exactly in a create/extract smoke.

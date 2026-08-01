@@ -372,8 +372,8 @@ static int sink_feed(struct sink *s, const uint8_t *data, size_t n) {
  * arrays. */
 #define MKZ_MOVE_TREE_MAX_DEPTH 1024
 
-/* Move every entry under src into dst: directories are merged (mkz_mkdir_p + recurse),
- * files are renamed over (atomic replace; staging lives under dest, same filesystem).
+/* Move every entry under src into dst: new directories are renamed as whole subtrees,
+ * existing directories are merged recursively, and files are renamed over atomically.
  * Emptied source dirs are removed with rmdir (refuses non-empty). `depth` is the current
  * nesting level (0 at the top call); past MKZ_MOVE_TREE_MAX_DEPTH, fails without
  * recursing further. The from/to path buffers are heap-allocated per call, not stack
@@ -402,14 +402,10 @@ static int move_tree_depth(const char *src, const char *dst, int depth) {
         struct stat st;
         if (lstat(from, &st)) { rc = -1; break; }
         if (S_ISDIR(st.st_mode)) {
-            if (mkz_mkdir_p(to) || move_tree_depth(from, to, depth + 1)) { rc = -1; break; }
-            /* Removing an already-moved entry's now-empty source dir while still
-             * iterating this same directory is the standard `rm -rf` walk pattern: only
-             * entries readdir() already handed back are touched, never ones not yet
-             * seen. POSIX leaves concurrent directory mutation during readdir()
-             * implementation-defined in general, but this restricted pattern (remove
-             * only what you already consumed) is safe on the filesystems mkz targets
-             * (ext4, APFS, UFS, ZFS, tmpfs, ...). */
+            if (rename(from, to) == 0) continue;
+            struct stat dst_st;
+            if (lstat(to, &dst_st) || !S_ISDIR(dst_st.st_mode)) { rc = -1; break; }
+            if (move_tree_depth(from, to, depth + 1)) { rc = -1; break; }
             rmdir(from);
         } else {
             if (rename(from, to)) { rc = -1; break; }

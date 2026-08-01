@@ -3,6 +3,27 @@
 Notable changes to mkz and autocol. Versions are SemVer; format loosely follows
 Keep a Changelog.
 
+## [0.1.5] - 2026-08-01
+
+### release prep
+- Adds the public design and RFC set for the v2 starting point: reconstruction
+  fabric, PAS2 seekable segments, autocol v2 field-aware lanes, and the
+  Hilbert/UTF-16 ceremony boundary.
+- Treats `v0.1.5` as the accepted base for the v2 working tree.
+- Keeps default writers on PAS1 + autocol v1 + zstd. This release does not
+  introduce v2 interchange bytes.
+
+### C build / OpenBSD
+- Fixes OpenBSD extraction placement for deeply nested verified archives. The final
+  staging-to-destination move now renames new directories as whole subtrees and only
+  falls back to recursive merge when a destination directory already exists, avoiding
+  fragile deep traversal during placement.
+- Adds a regression that extracts into an existing destination directory, preserving
+  the merge path while keeping the fast whole-subtree move path covered by deep
+  nesting tests.
+- Rebuilds the OpenBSD 7.9/arm64 port inputs and package from the patched 0.1.5
+  distfile.
+
 ## [0.1.4] - 2026-07-28
 
 ### release prep

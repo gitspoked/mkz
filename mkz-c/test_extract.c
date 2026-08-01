@@ -157,6 +157,41 @@ static int files_equal(const char *a, const char *b) {
     return eq;
 }
 
+static void test_existing_destination_dir_merge(void) {
+    const char *base = "/tmp/mkz_test_merge";
+    char ws[128];
+    snprintf(ws, sizeof ws, "%s.%ld", base, (long)getpid());
+
+    char srcdir[192], srcfile[224], arc[192], dest[192], existing_dir[224];
+    snprintf(srcdir, sizeof srcdir, "%s/src", ws);
+    snprintf(srcfile, sizeof srcfile, "%s/a.log", srcdir);
+    snprintf(arc, sizeof arc, "%s/a.mkz", ws);
+    snprintf(dest, sizeof dest, "%s/out", ws);
+    snprintf(existing_dir, sizeof existing_dir, "%s/tmp", dest);
+    assert(mkz_mkdir_p(srcdir) == 0);
+    assert(mkz_mkdir_p(existing_dir) == 0);
+
+    FILE *f = fopen(srcfile, "wb");
+    assert(f && fputs("merge\n", f) >= 0 && fclose(f) == 0);
+
+    char marker[256];
+    snprintf(marker, sizeof marker, "%s/marker", existing_dir);
+    f = fopen(marker, "wb");
+    assert(f && fputs("keep\n", f) >= 0 && fclose(f) == 0);
+
+    assert(mkz_create_stream((const char *[]){srcdir}, 1, arc, 12, 0, 0) == 0);
+    assert(mkz_extract_stream(arc, dest, 0) == 0);
+
+    char extracted[416];
+    assert((size_t)snprintf(extracted, sizeof extracted, "%s%s", dest, srcfile)
+           < sizeof extracted);
+    assert(files_equal(srcfile, extracted));
+    f = fopen(marker, "rb");
+    assert(f);
+    fclose(f);
+    fprintf(stderr, "ok: extract merged into existing destination directory\n");
+}
+
 static void test_scratch_reuse_mixed_blocks(void) {
     const char *base = "/tmp/mkz_test_scratch";
     char ws[128];
@@ -253,6 +288,7 @@ int main(void) {
 
     test_deep_nesting(DEEP_LEVELS_BASELINE);
     test_deep_nesting(DEEP_LEVELS_REGRESSION);
+    test_existing_destination_dir_merge();
     test_scratch_reuse_mixed_blocks();
     return 0;
 }
